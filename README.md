@@ -15,6 +15,11 @@ $ pip3 install --user --upgrade systemctl-mqtt
 $ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
 ```
 
+On debian-based systems, dependencies can optionally be installed via:
+```sh
+$ sudo apt-get install --no-install-recommends python3-dbus python3-paho-mqtt
+```
+
 Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/poweroff`.
 
 ```sh
