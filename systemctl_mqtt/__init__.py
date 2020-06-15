@@ -52,7 +52,10 @@ def _schedule_shutdown(action: str) -> None:
         shutdown_datetime.isoformat(sep=" ", timespec="seconds"),
     )
     shutdown_epoch_usec = int(shutdown_datetime.timestamp() * 10 ** 6)
-    _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
+    try:
+        _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
+    except dbus.DBusException as exc:
+        _LOGGER.error("failed to schedule shutdown: %s", exc.get_dbus_message())
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
@@ -101,7 +104,9 @@ def _mqtt_on_message(
     except KeyError:
         _LOGGER.warning("unexpected topic %s", message.topic)
         return
+    _LOGGER.debug("executing action %r", action)
     action()
+    _LOGGER.debug("completed action %r", action)
 
 
 def _run(

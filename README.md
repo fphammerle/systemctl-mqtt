@@ -50,6 +50,12 @@ homeassistant:
       icon: mdi:power
 ```
 
+## Docker 🐳
+
+1. Clone this repository.
+2. Edit `docker-compose.yml`.
+3. `docker-compose up --build`
+
 ## MQTT Authentication
 
 ```sh

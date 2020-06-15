@@ -1,0 +1,28 @@
+version: '2.2'
+
+volumes:
+  config:
+
+services:
+  mqtt_client:
+    build: .
+    image: fphammerle/systemctl-mqtt
+    volumes:
+    - config:/etc/systemctl-mqtt:ro
+    - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:rw
+    command: systemctl-mqtt
+      --mqtt-host mqtt-broker.local
+      --mqtt-username raspberrypi
+      --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
+    hostname: raspberrypi
+    network_mode: host # TODO verify required
+    userns_mode: host # required for host network mode
+    user: root # TODO
+    security_opt:
+    - no-new-privileges
+    - apparmor=unconfined # TODO
+    # docker-compose >=2.2,<3
+    cpus: 0.4
+    mem_limit: 32M
+
+# https://docs.docker.com/compose/compose-file/compose-file-v2/
