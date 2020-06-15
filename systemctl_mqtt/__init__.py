@@ -117,6 +117,7 @@ def _run(
     )
     mqtt_client.on_connect = _mqtt_on_connect
     mqtt_client.on_message = _mqtt_on_message
+    mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
     _LOGGER.info(
         "connecting to MQTT broker %s:%d", mqtt_host, mqtt_port,
     )
@@ -143,7 +144,7 @@ def _main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)
-    argparser.add_argument("--mqtt-port", type=int, default=1883)
+    argparser.add_argument("--mqtt-port", type=int, default=8883)
     argparser.add_argument("--mqtt-username", type=str)
     password_argument_group = argparser.add_mutually_exclusive_group()
     password_argument_group.add_argument("--mqtt-password", type=str)
@@ -159,7 +160,7 @@ def _main() -> None:
         "--mqtt-topic-prefix",
         type=str,
         default="systemctl/" + _get_hostname(),
-        help="test",
+        help=" ",  # show default
     )
     args = argparser.parse_args()
     if args.mqtt_password_path:

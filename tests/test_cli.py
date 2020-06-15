@@ -36,7 +36,7 @@ import systemctl_mqtt
         (
             ["", "--mqtt-host", "mqtt-broker.local"],
             "mqtt-broker.local",
-            1883,
+            8883,
             None,
             None,
             None,
@@ -52,7 +52,7 @@ import systemctl_mqtt
         (
             ["", "--mqtt-host", "mqtt-broker.local", "--mqtt-username", "me"],
             "mqtt-broker.local",
-            1883,
+            8883,
             "me",
             None,
             None,
@@ -68,7 +68,7 @@ import systemctl_mqtt
                 "secret",
             ],
             "mqtt-broker.local",
-            1883,
+            8883,
             "me",
             "secret",
             None,
@@ -82,7 +82,7 @@ import systemctl_mqtt
                 "system/command",
             ],
             "mqtt-broker.local",
-            1883,
+            8883,
             None,
             None,
             "system/command",
@@ -146,7 +146,7 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         systemctl_mqtt._main()
     run_mock.assert_called_once_with(
         mqtt_host="localhost",
-        mqtt_port=1883,
+        mqtt_port=8883,
         mqtt_username="me",
         mqtt_password=expected_password,
         mqtt_topic_prefix="systemctl/hostname",

@@ -50,6 +50,7 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert isinstance(settings, systemctl_mqtt._Settings)
     assert mqtt_topic_prefix + "/poweroff" in settings.mqtt_topic_action_mapping
     assert not mqtt_client_mock().username_pw_set.called
+    mqtt_client_mock().tls_set.assert_called_once_with(ca_certs=None)
     mqtt_client_mock().connect.assert_called_once_with(host=mqtt_host, port=mqtt_port)
     mqtt_client_mock().socket().getpeername.return_value = (mqtt_host, mqtt_port)
     mqtt_client_mock().on_connect(mqtt_client_mock(), settings, {}, 0)
