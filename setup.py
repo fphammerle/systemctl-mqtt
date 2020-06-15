@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# import pathlib
+import pathlib
 
 import setuptools
 
@@ -30,7 +30,7 @@ setuptools.setup(
     },
     packages=setuptools.find_packages(),
     description="MQTT client triggering shutdown on systemd-based systems",
-    # TODO long_description=pathlib.Path(__file__).parent.joinpath("README.md").read_text(),
+    long_description=pathlib.Path(__file__).parent.joinpath("README.md").read_text(),
     long_description_content_type="text/markdown",
     author="Fabian Peter Hammerle",
     author_email="fabian@hammerle.me",
