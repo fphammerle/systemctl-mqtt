@@ -26,6 +26,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - run: pip install --upgrade pipenv>=2018.10.9
+    - run: apt-get install --yes --no-install-recommends libdbus-1-dev
     - run: pipenv install --deploy --dev
     # ModuleNotFoundError: No module named 'importlib_metadata'
     # https://github.com/WanzenBug/pylint-import-requirements/issues/17
