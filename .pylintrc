@@ -1,0 +1,6 @@
+[MESSAGE CONTROL]
+
+disable=bad-continuation, # black
+        consider-iterating-dictionary, # "Explicit is better than implicit."
+        missing-function-docstring,
+        missing-module-docstring

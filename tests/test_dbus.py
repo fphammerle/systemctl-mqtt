@@ -1,0 +1,57 @@
+import datetime
+import unittest.mock
+
+import dbus
+import pytest
+
+import systemctl_mqtt
+
+_UTC = datetime.timezone(offset=datetime.timedelta(seconds=0))
+
+# pylint: disable=protected-access
+
+
+def test__get_login_manager():
+    login_manager = systemctl_mqtt._get_login_manager()
+    assert isinstance(login_manager, dbus.proxies.Interface)
+    assert login_manager.dbus_interface == "org.freedesktop.login1.Manager"
+    # https://freedesktop.org/wiki/Software/systemd/logind/
+    assert isinstance(login_manager.CanPowerOff(), dbus.String)
+
+
+@pytest.mark.parametrize("action", ["poweroff", "reboot"])
+def test__schedule_shutdown(action):
+    login_manager_mock = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+    ):
+        systemctl_mqtt._schedule_shutdown(action=action)
+    login_manager_mock.ScheduleShutdown.assert_called_once()
+    schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
+    assert len(schedule_args) == 2
+    assert schedule_args[0] == action
+    shutdown_datetime = datetime.datetime.fromtimestamp(
+        schedule_args[1] / 10 ** 6, tz=_UTC,
+    )
+    delay = shutdown_datetime - datetime.datetime.now(tz=_UTC)
+    assert delay.total_seconds() == pytest.approx(
+        datetime.timedelta(seconds=4).total_seconds(), abs=0.1,
+    )
+    assert not schedule_kwargs
+
+
+@pytest.mark.parametrize(
+    ("topic_suffix", "expected_action_arg"), [("poweroff", "poweroff")]
+)
+def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
+    action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[topic_suffix]
+    login_manager_mock = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+    ):
+        action()
+    login_manager_mock.ScheduleShutdown.assert_called_once()
+    schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
+    assert len(schedule_args) == 2
+    assert schedule_args[0] == expected_action_arg
+    assert not schedule_kwargs
