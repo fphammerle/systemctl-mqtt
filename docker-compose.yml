@@ -15,12 +15,18 @@ services:
       --mqtt-username raspberrypi
       --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
     hostname: raspberrypi
-    network_mode: host # TODO verify required
-    userns_mode: host # required for host network mode
-    user: root # TODO
+    network_mode: host # TODO verify if required
+    userns_mode: host
+    # prefering explicit user specification over "USER 0" in Dockerfile
+    # to avoid accidental container startup without
+    # secure apparmor profile and dropped capabilities
+    user: '0'
+    read_only: true
+    cap_drop: [all]
     security_opt:
     - no-new-privileges
-    - apparmor=unconfined # TODO
+    # $ sudo apparmor_parser --replace ./apparmor-profile
+    - apparmor=systemctl-mqtt
     # docker-compose >=2.2,<3
     cpus: 0.4
     mem_limit: 32M
