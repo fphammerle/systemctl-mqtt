@@ -53,6 +53,18 @@ def _schedule_shutdown(action: str) -> None:
     )
     shutdown_epoch_usec = int(shutdown_datetime.timestamp() * 10 ** 6)
     try:
+        # $ gdbus introspect --system --dest org.freedesktop.login1 \
+        #       --object-path /org/freedesktop/login1 | grep -A 1 ScheduleShutdown
+        # ScheduleShutdown(in  s arg_0,
+        #                  in  t arg_1);
+        # $ gdbus call --system --dest org.freedesktop.login1 \
+        #       --object-path /org/freedesktop/login1 \
+        #       --method org.freedesktop.login1.Manager.ScheduleShutdown \
+        #       poweroff "$(date --date=10min +%s)000000"
+        # $ dbus-send --type=method_call --print-reply --system --dest=org.freedesktop.login1 \
+        #       /org/freedesktop/login1 \
+        #       org.freedesktop.login1.Manager.ScheduleShutdown \
+        #       string:poweroff "uint64:$(date --date=10min +%s)000000"
         _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
     except dbus.DBusException as exc:
         exc_msg = exc.get_dbus_message()
