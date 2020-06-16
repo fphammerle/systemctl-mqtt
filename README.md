@@ -55,7 +55,7 @@ homeassistant:
 1. Clone this repository.
 2. Edit `docker-compose.yml`.
 3. Load [AppArmor](https://en.wikipedia.org/wiki/AppArmor) profile:
-   `sudo apparmor_parser ./apparmor-profile`
+   `sudo apparmor_parser ./docker-apparmor-profile`
 4. `sudo docker-compose up --build`
 
 ## MQTT Authentication

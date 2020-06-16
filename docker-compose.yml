@@ -25,7 +25,7 @@ services:
     cap_drop: [all]
     security_opt:
     - no-new-privileges
-    # $ sudo apparmor_parser --replace ./apparmor-profile
+    # $ sudo apparmor_parser --replace ./docker-apparmor-profile
     - apparmor=systemctl-mqtt
     # docker-compose >=2.2,<3
     cpus: 0.4
