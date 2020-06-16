@@ -59,8 +59,17 @@ def test__schedule_shutdown(action):
 
 
 @pytest.mark.parametrize("action", ["poweroff"])
-@pytest.mark.parametrize("exception_message", ["test message"])
-def test__schedule_shutdown_fail(caplog, action, exception_message):
+@pytest.mark.parametrize(
+    ("exception_message", "log_message"),
+    [
+        ("test message", "test message"),
+        (
+            "Interactive authentication required.",
+            "unauthorized; missing polkit authorization rules?",
+        ),
+    ],
+)
+def test__schedule_shutdown_fail(caplog, action, exception_message, log_message):
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.ScheduleShutdown.side_effect = dbus.DBusException(
         exception_message
@@ -75,7 +84,7 @@ def test__schedule_shutdown_fail(caplog, action, exception_message):
     assert caplog.records[0].message.startswith("scheduling {} for ".format(action))
     assert caplog.records[1].levelno == logging.ERROR
     assert caplog.records[1].message == "failed to schedule {}: {}".format(
-        action, exception_message
+        action, log_message
     )
 
 

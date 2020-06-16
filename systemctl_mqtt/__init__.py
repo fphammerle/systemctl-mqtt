@@ -55,7 +55,14 @@ def _schedule_shutdown(action: str) -> None:
     try:
         _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
     except dbus.DBusException as exc:
-        _LOGGER.error("failed to schedule %s: %s", action, exc.get_dbus_message())
+        exc_msg = exc.get_dbus_message()
+        if "authentication required" in exc_msg.lower():
+            _LOGGER.error(
+                "failed to schedule %s: unauthorized; missing polkit authorization rules?",
+                action,
+            )
+        else:
+            _LOGGER.error("failed to schedule %s: %s", action, exc_msg)
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
