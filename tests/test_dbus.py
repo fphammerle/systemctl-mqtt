@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import datetime
+import logging
 import unittest.mock
 
 import dbus
@@ -55,6 +56,27 @@ def test__schedule_shutdown(action):
         datetime.timedelta(seconds=4).total_seconds(), abs=0.1,
     )
     assert not schedule_kwargs
+
+
+@pytest.mark.parametrize("action", ["poweroff"])
+@pytest.mark.parametrize("exception_message", ["test message"])
+def test__schedule_shutdown_fail(caplog, action, exception_message):
+    login_manager_mock = unittest.mock.MagicMock()
+    login_manager_mock.ScheduleShutdown.side_effect = dbus.DBusException(
+        exception_message
+    )
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+    ), caplog.at_level(logging.DEBUG):
+        systemctl_mqtt._schedule_shutdown(action=action)
+    login_manager_mock.ScheduleShutdown.assert_called_once()
+    assert len(caplog.records) == 2
+    assert caplog.records[0].levelno == logging.INFO
+    assert caplog.records[0].message.startswith("scheduling {} for ".format(action))
+    assert caplog.records[1].levelno == logging.ERROR
+    assert caplog.records[1].message == "failed to schedule {}: {}".format(
+        action, exception_message
+    )
 
 
 @pytest.mark.parametrize(

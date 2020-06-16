@@ -55,7 +55,7 @@ def _schedule_shutdown(action: str) -> None:
     try:
         _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
     except dbus.DBusException as exc:
-        _LOGGER.error("failed to schedule shutdown: %s", exc.get_dbus_message())
+        _LOGGER.error("failed to schedule %s: %s", action, exc.get_dbus_message())
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
