@@ -58,6 +58,10 @@ homeassistant:
    `sudo apparmor_parser ./docker-apparmor-profile`
 4. `sudo docker-compose up --build`
 
+Pre-built docker image are available at https://hub.docker.com/r/fphammerle/systemctl-mqtt/tags
+
+Annotation of signed tags `docker/*` contains docker image digests: https://github.com/fphammerle/systemctl-mqtt/tags
+
 ## MQTT Authentication
 
 ```sh
