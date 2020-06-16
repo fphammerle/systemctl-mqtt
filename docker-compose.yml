@@ -15,7 +15,6 @@ services:
       --mqtt-username raspberrypi
       --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
     hostname: raspberrypi
-    network_mode: host # TODO verify if required
     userns_mode: host
     # prefering explicit user specification over "USER 0" in Dockerfile
     # to avoid accidental container startup without
