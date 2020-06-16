@@ -115,10 +115,18 @@ def test__mqtt_on_message_poweroff(caplog, mqtt_topic_prefix: str, payload: byte
         systemctl_mqtt._mqtt_on_message(
             None, settings, message,
         )
-    assert len(caplog.records) == 1
+    assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
         "received topic={} payload={!r}".format(mqtt_topic, payload)
+    )
+    assert caplog.records[1].levelno == logging.DEBUG
+    assert caplog.records[1].message.startswith(
+        "executing action {!r}".format(action_mock)
+    )
+    assert caplog.records[2].levelno == logging.DEBUG
+    assert caplog.records[2].message.startswith(
+        "completed action {!r}".format(action_mock)
     )
     action_mock.assert_called_once_with()
 
