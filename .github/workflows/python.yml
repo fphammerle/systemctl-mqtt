@@ -26,8 +26,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - run: pip install --upgrade pipenv>=2018.10.9
     - run: sudo apt-get update
-    # TODO exclude dbus-python from pipenv install
-    - run: sudo apt-get install --yes --no-install-recommends libdbus-1-dev
+    # TODO exclude dbus-python & PyGObject from pipenv install
+    - run: sudo apt-get install --yes --no-install-recommends
+        libdbus-1-dev
+        libgirepository1.0-dev
     - run: pipenv install --python "$PYTHON_VERSION" --deploy --dev
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}
@@ -50,7 +52,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - run: pip install --upgrade pipenv>=2018.10.9
     - run: sudo apt-get update
-    - run: sudo apt-get install --yes --no-install-recommends libdbus-1-dev
+    - run: sudo apt-get install --yes --no-install-recommends
+        libdbus-1-dev
+        libgirepository1.0-dev
     - run: pipenv install --python "$PYTHON_VERSION" --deploy --dev
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}

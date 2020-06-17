@@ -25,6 +25,8 @@ import typing
 
 import dbus
 
+# https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
+import gi.repository.GLib
 import paho.mqtt.client
 
 _LOGGER = logging.getLogger(__name__)
@@ -166,7 +168,19 @@ def _run(
     elif mqtt_password:
         raise ValueError("Missing MQTT username")
     mqtt_client.connect(host=mqtt_host, port=mqtt_port)
-    mqtt_client.loop_forever()
+    # loop_start runs loop_forever in a new thread (daemon)
+    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1814
+    # loop_forever attempts to reconnect if disconnected
+    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
+    mqtt_client.loop_start()
+    try:
+        # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
+        gi.repository.GLib.MainLoop().run()
+    finally:
+        # blocks until loop_forever stops
+        _LOGGER.debug("waiting for MQTT loop to stop")
+        mqtt_client.loop_stop()
+        _LOGGER.debug("MQTT loop stopped")
 
 
 def _get_hostname() -> str:

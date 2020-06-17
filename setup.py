@@ -62,7 +62,7 @@ setuptools.setup(
     ],
     entry_points={"console_scripts": ["systemctl-mqtt = systemctl_mqtt:_main",]},
     # https://dbus.freedesktop.org/doc/dbus-python/news.html
-    install_requires=["dbus-python<2", "paho-mqtt<2"],
+    install_requires=["PyGObject<4", "dbus-python<2", "paho-mqtt<2"],
     setup_requires=["setuptools_scm"],
     tests_require=["pytest"],
 )

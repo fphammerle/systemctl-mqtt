@@ -28,6 +28,18 @@
             ],
             "version": "==1.5.0"
         },
+        "pycairo": {
+            "hashes": [
+                "sha256:2c143183280feb67f5beb4e543fd49990c28e7df427301ede04fc550d3562e84"
+            ],
+            "version": "==1.19.1"
+        },
+        "pygobject": {
+            "hashes": [
+                "sha256:012a589aec687bfa809a1ff9f5cd775dc7f6fcec1a6bc7fe88e1002a68f8ba34"
+            ],
+            "version": "==3.36.1"
+        },
         "systemctl-mqtt": {
             "editable": true,
             "path": "."

@@ -16,6 +16,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+import threading
+import time
 import unittest.mock
 
 import pytest
@@ -37,7 +39,9 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
         "ssl.SSLContext.wrap_socket", autospec=True,
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
-    ) as mqtt_loop_forever_mock:
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "gi.repository.GLib.MainLoop.run"
+    ) as glib_loop_mock:
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
@@ -60,6 +64,8 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert ssl_context.check_hostname is True
     assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
     # loop started?
+    while threading.active_count() > 1:
+        time.sleep(0.01)
     assert mqtt_loop_forever_mock.call_count == 1
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
     assert mqtt_client._tls_insecure is False
@@ -109,6 +115,11 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     )
     assert caplog.records[1].message.startswith("executing action poweroff")
     assert caplog.records[2].message.startswith("completed action poweroff")
+    # dbus loop started?
+    glib_loop_mock.assert_called_once_with()
+    # waited for mqtt loop to stop?
+    assert mqtt_client._thread_terminate
+    assert mqtt_client._thread is None
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
@@ -123,7 +134,9 @@ def test__run_authentication(
         "ssl.SSLContext.wrap_socket"
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
-    ) as mqtt_loop_forever_mock:
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "gi.repository.GLib.MainLoop.run"
+    ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
