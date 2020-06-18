@@ -35,9 +35,9 @@ _SHUTDOWN_DELAY = datetime.timedelta(seconds=4)
 def _get_login_manager() -> dbus.proxies.Interface:
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html
     bus = dbus.SystemBus()
-    proxy: dbus.proxies.ProxyObject = bus.get_object(
+    proxy = bus.get_object(
         bus_name="org.freedesktop.login1", object_path="/org/freedesktop/login1"
-    )
+    )  # type: dbus.proxies.ProxyObject
     # https://freedesktop.org/wiki/Software/systemd/logind/
     return dbus.Interface(object=proxy, dbus_interface="org.freedesktop.login1.Manager")
 
@@ -85,7 +85,7 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 class _Settings:
     # pylint: disable=too-few-public-methods
     def __init__(self, mqtt_topic_prefix: str) -> None:
-        self.mqtt_topic_action_mapping: typing.Dict[str, typing.Callable] = {}
+        self.mqtt_topic_action_mapping = {}  # type: typing.Dict[str, typing.Callable]
         for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
             topic = mqtt_topic_prefix + "/" + topic_suffix
             self.mqtt_topic_action_mapping[topic] = action
