@@ -42,7 +42,7 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
         )
-    mqtt_client_mock.assert_called_once()
+    assert mqtt_client_mock.call_count == 1  # .assert_called_once requires python>=v3.6
     init_args, init_kwargs = mqtt_client_mock.call_args
     assert not init_args
     assert len(init_kwargs) == 1
@@ -58,7 +58,7 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
         mqtt_topic_prefix + "/poweroff"
     )
     mqtt_client_mock().on_message(mqtt_client_mock(), settings, "message")
-    message_handler_mock.assert_called_once()
+    assert message_handler_mock.call_count == 1
     mqtt_client_mock().loop_forever.assert_called_once_with()
 
 
@@ -78,7 +78,7 @@ def test__run_authentication(
             mqtt_password=mqtt_password,
             mqtt_topic_prefix=mqtt_topic_prefix,
         )
-    mqtt_client_mock.assert_called_once()
+    assert mqtt_client_mock.call_count == 1
     init_args, init_kwargs = mqtt_client_mock.call_args
     assert not init_args
     assert set(init_kwargs.keys()) == {"userdata"}
