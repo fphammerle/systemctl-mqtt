@@ -46,10 +46,10 @@ def _schedule_shutdown(action: str) -> None:
     # https://github.com/systemd/systemd/blob/v237/src/systemctl/systemctl.c#L8553
     assert action in ["poweroff", "reboot"], action
     shutdown_datetime = datetime.datetime.now() + _SHUTDOWN_DELAY
+    # datetime.datetime.isoformat(timespec=) not available in python3.5
+    # https://github.com/python/cpython/blob/v3.5.9/Lib/datetime.py#L1552
     _LOGGER.info(
-        "scheduling %s for %s",
-        action,
-        shutdown_datetime.isoformat(sep=" ", timespec="seconds"),
+        "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S"),
     )
     shutdown_epoch_usec = int(shutdown_datetime.timestamp() * 10 ** 6)
     try:
