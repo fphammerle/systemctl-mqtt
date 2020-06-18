@@ -44,7 +44,7 @@ def test__schedule_shutdown(action):
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ):
         systemctl_mqtt._schedule_shutdown(action=action)
-    login_manager_mock.ScheduleShutdown.assert_called_once()
+    assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == action
@@ -78,7 +78,7 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ), caplog.at_level(logging.DEBUG):
         systemctl_mqtt._schedule_shutdown(action=action)
-    login_manager_mock.ScheduleShutdown.assert_called_once()
+    assert login_manager_mock.ScheduleShutdown.call_count == 1
     assert len(caplog.records) == 2
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message.startswith("scheduling {} for ".format(action))
@@ -98,7 +98,7 @@ def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ):
         action()
-    login_manager_mock.ScheduleShutdown.assert_called_once()
+    assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == expected_action_arg
