@@ -24,10 +24,11 @@ import socket
 import typing
 
 import dbus
-
-# https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
-import gi.repository.GLib
 import paho.mqtt.client
+
+# black keeps inserting a blank line above
+# https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
+import gi.repository.GLib  # pylint-import-requirements: imports=PyGObject
 
 _LOGGER = logging.getLogger(__name__)
 
