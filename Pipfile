@@ -12,7 +12,8 @@ systemctl-mqtt = {editable = true,path = "."}
 black = {version = "==19.10b0", markers = "python_version >= '3.6'"}
 mypy = "*"
 pylint = "*"
-pylint-import-requirements = "*"
+# https://github.com/WanzenBug/pylint-import-requirements/pull/19
+pylint-import-requirements = {git = "https://github.com/fphammerle/pylint-import-requirements", ref = "skip-custom-loaders"}
 pytest = "*"
 pytest-cov = "*"
 
