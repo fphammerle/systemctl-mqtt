@@ -34,13 +34,13 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
     with unittest.mock.patch(
         "socket.create_connection"
     ) as create_socket_mock, unittest.mock.patch(
-        "ssl.SSLSocket"
-    ) as ssl_socket_mock, unittest.mock.patch(
+        "ssl.SSLContext.wrap_socket", autospec=True,
+    ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._mqtt_on_message"
     ) as message_handler_mock:
-        ssl_socket_mock.return_value.send = len
+        ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -53,8 +53,10 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
     create_socket_args, _ = create_socket_mock.call_args
     assert create_socket_args[0] == (mqtt_host, mqtt_port)
     # ssl enabled?
-    assert ssl_socket_mock.call_count == 1
-    assert ssl_socket_mock.call_args[1]["_context"].check_hostname is True
+    assert ssl_wrap_socket_mock.call_count == 1
+    ssl_context = ssl_wrap_socket_mock.call_args[0][0]  # self
+    assert ssl_context.check_hostname is True
+    assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
     # loop started?
     assert mqtt_loop_forever_mock.call_count == 1
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
@@ -87,11 +89,11 @@ def test__run_authentication(
     mqtt_host, mqtt_port, mqtt_username, mqtt_password, mqtt_topic_prefix
 ):
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
-        "ssl.SSLSocket"
-    ) as ssl_socket_mock, unittest.mock.patch(
+        "ssl.SSLContext.wrap_socket"
+    ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
     ) as mqtt_loop_forever_mock:
-        ssl_socket_mock.return_value.send = len
+        ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
