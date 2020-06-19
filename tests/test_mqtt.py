@@ -31,10 +31,15 @@ import systemctl_mqtt
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
 def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
     with unittest.mock.patch(
-        "paho.mqtt.client.Client"
-    ) as mqtt_client_mock, unittest.mock.patch(
+        "socket.create_connection"
+    ) as create_socket_mock, unittest.mock.patch(
+        "ssl.SSLContext.wrap_socket", autospec=True,
+    ) as ssl_wrap_socket_mock, unittest.mock.patch(
+        "paho.mqtt.client.Client.loop_forever", autospec=True,
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._mqtt_on_message"
     ) as message_handler_mock:
+        ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -42,24 +47,36 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
         )
-    assert mqtt_client_mock.call_count == 1  # .assert_called_once requires python>=v3.6
-    init_args, init_kwargs = mqtt_client_mock.call_args
-    assert not init_args
-    assert len(init_kwargs) == 1
-    settings = init_kwargs["userdata"]
-    assert isinstance(settings, systemctl_mqtt._Settings)
-    assert mqtt_topic_prefix + "/poweroff" in settings.mqtt_topic_action_mapping
-    assert not mqtt_client_mock().username_pw_set.called
-    mqtt_client_mock().tls_set.assert_called_once_with(ca_certs=None)
-    mqtt_client_mock().connect.assert_called_once_with(host=mqtt_host, port=mqtt_port)
-    mqtt_client_mock().socket().getpeername.return_value = (mqtt_host, mqtt_port)
-    mqtt_client_mock().on_connect(mqtt_client_mock(), settings, {}, 0)
-    mqtt_client_mock().subscribe.assert_called_once_with(
-        mqtt_topic_prefix + "/poweroff"
+    # correct remote?
+    assert create_socket_mock.call_count == 1
+    create_socket_args, _ = create_socket_mock.call_args
+    assert create_socket_args[0] == (mqtt_host, mqtt_port)
+    # ssl enabled?
+    assert ssl_wrap_socket_mock.call_count == 1
+    ssl_context = ssl_wrap_socket_mock.call_args[0][0]  # self
+    assert ssl_context.check_hostname is True
+    assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
+    # loop started?
+    assert mqtt_loop_forever_mock.call_count == 1
+    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
+    assert mqtt_client._tls_insecure is False
+    # credentials
+    assert mqtt_client._username is None
+    assert mqtt_client._password is None
+    # connect callback
+    mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
+    with unittest.mock.patch(
+        "paho.mqtt.client.Client.subscribe"
+    ) as mqtt_subscribe_mock:
+        mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
+    mqtt_subscribe_mock.assert_called_once_with(mqtt_topic_prefix + "/poweroff")
+    # message callback
+    test_message = MQTTMessage(topic=b"test")
+    message_handler_mock.assert_not_called()
+    mqtt_client._handle_on_message(test_message)
+    message_handler_mock.assert_called_once_with(
+        mqtt_client, mqtt_client._userdata, test_message
     )
-    mqtt_client_mock().on_message(mqtt_client_mock(), settings, "message")
-    assert message_handler_mock.call_count == 1
-    mqtt_client_mock().loop_forever.assert_called_once_with()
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
@@ -70,7 +87,12 @@ def test__run(mqtt_host, mqtt_port, mqtt_topic_prefix):
 def test__run_authentication(
     mqtt_host, mqtt_port, mqtt_username, mqtt_password, mqtt_topic_prefix
 ):
-    with unittest.mock.patch("paho.mqtt.client.Client") as mqtt_client_mock:
+    with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
+        "ssl.SSLContext.wrap_socket"
+    ) as ssl_wrap_socket_mock, unittest.mock.patch(
+        "paho.mqtt.client.Client.loop_forever", autospec=True,
+    ) as mqtt_loop_forever_mock:
+        ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -78,13 +100,13 @@ def test__run_authentication(
             mqtt_password=mqtt_password,
             mqtt_topic_prefix=mqtt_topic_prefix,
         )
-    assert mqtt_client_mock.call_count == 1
-    init_args, init_kwargs = mqtt_client_mock.call_args
-    assert not init_args
-    assert set(init_kwargs.keys()) == {"userdata"}
-    mqtt_client_mock().username_pw_set.assert_called_once_with(
-        username=mqtt_username, password=mqtt_password,
-    )
+    assert mqtt_loop_forever_mock.call_count == 1
+    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
+    assert mqtt_client._username.decode() == mqtt_username
+    if mqtt_password:
+        assert mqtt_client._password.decode() == mqtt_password
+    else:
+        assert mqtt_client._password is None
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
