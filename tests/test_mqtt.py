@@ -42,7 +42,9 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
         "paho.mqtt.client.Client.loop_forever", autospec=True,
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
-    ) as glib_loop_mock:
+    ) as glib_loop_mock, unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
@@ -126,6 +128,8 @@ def test__run_authentication(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
+    ), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
     ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
@@ -153,6 +157,8 @@ def _initialize_mqtt_client(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
+    ), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
     ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
@@ -198,7 +204,9 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_password", ["secret"])
 def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_password):
-    with unittest.mock.patch("paho.mqtt.client.Client"):
+    with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
         with pytest.raises(ValueError):
             systemctl_mqtt._run(
                 mqtt_host=mqtt_host,
@@ -262,22 +270,3 @@ def test_mqtt_message_callback_poweroff_retained(
     )
     assert caplog.records[1].levelno == logging.INFO
     assert caplog.records[1].message == "ignoring retained message"
-
-
-def test_shutdown_lock():
-    state = systemctl_mqtt._State(mqtt_topic_prefix="any")
-    lock_fd = unittest.mock.MagicMock()
-    with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager"
-    ) as get_login_manager_mock:
-        get_login_manager_mock.return_value.Inhibit.return_value = lock_fd
-        state.acquire_shutdown_lock()
-    get_login_manager_mock.return_value.Inhibit.assert_called_once_with(
-        "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
-    )
-    assert state._shutdown_lock == lock_fd
-    # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
-    lock_fd.take.return_value = "fdnum"
-    with unittest.mock.patch("os.close") as close_mock:
-        state.release_shutdown_lock()
-    close_mock.assert_called_once_with("fdnum")

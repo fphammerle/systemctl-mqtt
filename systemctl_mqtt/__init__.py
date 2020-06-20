@@ -115,6 +115,11 @@ def _schedule_shutdown(action: str) -> None:
 class _State:
     def __init__(self, mqtt_topic_prefix: str) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
+        self._login_manager = _get_login_manager()  # type: dbus.proxies.Interface
+        self._login_manager.connect_to_signal(
+            signal_name="PrepareForShutdown",
+            handler_function=self.prepare_for_shutdown_handler,
+        )
         self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
         self._shutdown_lock_mutex = threading.Lock()
 
@@ -138,6 +143,14 @@ class _State:
                 os.close(self._shutdown_lock.take())
                 _LOGGER.debug("released shutdown inhibitor lock")
                 self._shutdown_lock = None
+
+    def prepare_for_shutdown_handler(self, active: bool) -> None:
+        if active:
+            _LOGGER.debug("system preparing for shutdown")
+            self.release_shutdown_lock()
+        else:
+            _LOGGER.debug("system shutdown failed?")
+            self.acquire_shutdown_lock()
 
 
 class _MQTTAction:
@@ -204,6 +217,8 @@ def _run(
     mqtt_password: typing.Optional[str],
     mqtt_topic_prefix: str,
 ) -> None:
+    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     # https://pypi.org/project/paho-mqtt/
     mqtt_client = paho.mqtt.client.Client(
         userdata=_State(mqtt_topic_prefix=mqtt_topic_prefix)
@@ -223,8 +238,6 @@ def _run(
     # loop_forever attempts to reconnect if disconnected
     # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
     mqtt_client.loop_start()
-    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     try:
         gi.repository.GLib.MainLoop().run()
     finally:
