@@ -15,8 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 import unittest.mock
 
+import dbus.types
 import pytest
 
 import systemctl_mqtt
@@ -42,23 +44,33 @@ def test_shutdown_lock():
 
 
 @pytest.mark.parametrize("active", [True, False])
-def test_prepare_for_shutdown_handler(active):
+def test_prepare_for_shutdown_handler(caplog, active):
     with unittest.mock.patch("systemctl_mqtt._get_login_manager"):
         state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+    mqtt_client_mock = unittest.mock.MagicMock()
+    state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client_mock)
     # pylint: disable=no-member,comparison-with-callable
     connect_to_signal_kwargs = state._login_manager.connect_to_signal.call_args[1]
     assert connect_to_signal_kwargs["signal_name"] == "PrepareForShutdown"
     handler_function = connect_to_signal_kwargs["handler_function"]
-    assert handler_function == state.prepare_for_shutdown_handler
+    assert handler_function.func == state._prepare_for_shutdown_handler
     with unittest.mock.patch.object(
         state, "acquire_shutdown_lock"
     ) as acquire_lock_mock, unittest.mock.patch.object(
         state, "release_shutdown_lock"
     ) as release_lock_mock:
-        handler_function(active)
+        handler_function(dbus.types.Boolean(active))
     if active:
         acquire_lock_mock.assert_not_called()
         release_lock_mock.assert_called_once_with()
     else:
         acquire_lock_mock.assert_called_once_with()
         release_lock_mock.assert_not_called()
+    mqtt_client_mock.publish.assert_called_once_with(
+        topic="any/preparing-for-shutdown", payload="true" if active else "false",
+    )
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert caplog.records[0].message.startswith(
+        "failed to publish on any/preparing-for-shutdown"
+    )
