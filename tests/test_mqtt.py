@@ -265,19 +265,19 @@ def test_mqtt_message_callback_poweroff_retained(
 
 
 def test_shutdown_lock():
-    settings = systemctl_mqtt._Settings(mqtt_topic_prefix="any")
+    state = systemctl_mqtt._State(mqtt_topic_prefix="any")
     lock_fd = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._get_login_manager"
     ) as get_login_manager_mock:
         get_login_manager_mock.return_value.Inhibit.return_value = lock_fd
-        settings.acquire_shutdown_lock()
+        state.acquire_shutdown_lock()
     get_login_manager_mock.return_value.Inhibit.assert_called_once_with(
         "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
     )
-    assert settings._shutdown_lock == lock_fd
+    assert state._shutdown_lock == lock_fd
     # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
     lock_fd.take.return_value = "fdnum"
     with unittest.mock.patch("os.close") as close_mock:
-        settings.release_shutdown_lock()
+        state.release_shutdown_lock()
     close_mock.assert_called_once_with("fdnum")

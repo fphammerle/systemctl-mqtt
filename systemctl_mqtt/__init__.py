@@ -112,7 +112,7 @@ def _schedule_shutdown(action: str) -> None:
     _log_shutdown_inhibitors(login_manager)
 
 
-class _Settings:
+class _State:
     def __init__(self, mqtt_topic_prefix: str) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
@@ -151,7 +151,7 @@ class _MQTTAction:
     def mqtt_message_callback(
         self,
         mqtt_client: paho.mqtt.client.Client,
-        settings: _Settings,
+        state: _State,
         message: paho.mqtt.client.MQTTMessage,
     ) -> None:
         # pylint: disable=unused-argument; callback
@@ -175,7 +175,7 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 
 def _mqtt_on_connect(
     mqtt_client: paho.mqtt.client.Client,
-    settings: _Settings,
+    state: _State,
     flags: typing.Dict,
     return_code: int,
 ) -> None:
@@ -184,9 +184,9 @@ def _mqtt_on_connect(
     assert return_code == 0, return_code  # connection accepted
     mqtt_broker_host, mqtt_broker_port = mqtt_client.socket().getpeername()
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
-    settings.acquire_shutdown_lock()
+    state.acquire_shutdown_lock()
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
-        topic = settings.mqtt_topic_prefix + "/" + topic_suffix
+        topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
         mqtt_client.subscribe(topic)
         mqtt_client.message_callback_add(
@@ -206,7 +206,7 @@ def _run(
 ) -> None:
     # https://pypi.org/project/paho-mqtt/
     mqtt_client = paho.mqtt.client.Client(
-        userdata=_Settings(mqtt_topic_prefix=mqtt_topic_prefix)
+        userdata=_State(mqtt_topic_prefix=mqtt_topic_prefix)
     )
     mqtt_client.on_connect = _mqtt_on_connect
     mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
