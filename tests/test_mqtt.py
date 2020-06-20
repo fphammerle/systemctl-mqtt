@@ -144,11 +144,7 @@ def test__run_authentication(
         assert mqtt_client._password is None
 
 
-@pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
-@pytest.mark.parametrize("mqtt_port", [1833])
-@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
-@pytest.fixture
-def initialized_mqtt_client(
+def _initialize_mqtt_client(
     mqtt_host, mqtt_port, mqtt_topic_prefix
 ) -> paho.mqtt.client.Client:
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
@@ -175,21 +171,20 @@ def initialized_mqtt_client(
     return mqtt_client
 
 
-# pylint: disable=redefined-outer-name
-
-
-def test__client_handle_message(
-    caplog, initialized_mqtt_client: paho.mqtt.client.Client
-):
-    caplog.set_level(logging.DEBUG)
-    settings = initialized_mqtt_client._userdata  # type: systemctl_mqtt._Settings
-    poweroff_message = MQTTMessage(
-        topic=settings.mqtt_topic_prefix.encode() + b"/poweroff"
+@pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
+@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
+def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
+    mqtt_client = _initialize_mqtt_client(
+        mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_topic_prefix=mqtt_topic_prefix
     )
+    caplog.clear()
+    caplog.set_level(logging.DEBUG)
+    poweroff_message = MQTTMessage(topic=mqtt_topic_prefix.encode() + b"/poweroff")
     with unittest.mock.patch.object(
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
     ) as poweroff_action_mock:
-        initialized_mqtt_client._handle_on_message(poweroff_message)
+        mqtt_client._handle_on_message(poweroff_message)
     poweroff_action_mock.assert_called_once_with()
     assert all(r.levelno == logging.DEBUG for r in caplog.records)
     assert caplog.records[0].message == "received topic={} payload=b''".format(
