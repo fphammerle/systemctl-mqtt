@@ -1,4 +1,4 @@
-# systemctl-mqtt - MQTT client triggering shutdown on systemd-based systems
+# systemctl-mqtt - MQTT client triggering & reporting shutdown on systemd-based systems
 #
 # Copyright (C) 2020 Fabian Peter Hammerle <fabian@hammerle.me>
 #

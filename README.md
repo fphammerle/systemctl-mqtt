@@ -6,7 +6,7 @@
 [![Last Release](https://img.shields.io/pypi/v/systemctl-mqtt.svg)](https://pypi.org/project/systemctl-mqtt/#history)
 [![Compatible Python Versions](https://img.shields.io/pypi/pyversions/systemctl-mqtt.svg)](https://pypi.org/project/systemctl-mqtt/)
 
-MQTT client triggering shutdown on [systemd](https://freedesktop.org/wiki/Software/systemd/)-based systems
+MQTT client triggering & reporting shutdown on [systemd](https://freedesktop.org/wiki/Software/systemd/)-based systems
 
 ## Setup
 
@@ -26,9 +26,17 @@ Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/powerof
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/poweroff -n
 ```
 
+### Shutdown Report
+
+`systemctl-mqtt` subscribes to [logind](https://freedesktop.org/wiki/Software/systemd/logind/)'s `PrepareForShutdown` signal.
+
+`systemctl halt|poweroff|reboot` triggers a message with payload `true` on topic `systemctl/hostname/preparing-for-shutdown`.
+
 ## Home Assistant 🏡
 
 ### Sample Setup
+
+#### Send Poweroff Command
 
 ```yaml
 # https://www.home-assistant.io/docs/mqtt/broker/#configuration-variables
@@ -48,6 +56,19 @@ homeassistant:
     script.poweroff_raspberry_pi:
       friendly_name: poweroff pi
       icon: mdi:power
+```
+
+#### Trigger Automation on Shutdown
+
+```yaml
+automation:
+- trigger:
+    platform: mqtt
+    topic: systemctl/raspberrypi/preparing-for-shutdown
+    payload: 'true'
+  action:
+    service: switch.turn_off
+    entity_id: switch.desk_lamp
 ```
 
 ## Docker 🐳

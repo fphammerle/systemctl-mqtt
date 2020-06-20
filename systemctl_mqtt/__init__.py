@@ -1,4 +1,4 @@
-# systemctl-mqtt - MQTT client triggering shutdown on systemd-based systems
+# systemctl-mqtt - MQTT client triggering & reporting shutdown on systemd-based systems
 #
 # Copyright (C) 2020 Fabian Peter Hammerle <fabian@hammerle.me>
 #
@@ -286,7 +286,7 @@ def _main() -> None:
         datefmt="%Y-%m-%dT%H:%M:%S%z",
     )
     argparser = argparse.ArgumentParser(
-        description="MQTT client triggering shutdown on systemd-based systems",
+        description="MQTT client triggering & reporting shutdown on systemd-based systems",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)

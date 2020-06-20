@@ -1,4 +1,4 @@
-# systemctl-mqtt - MQTT client triggering shutdown on systemd-based systems
+# systemctl-mqtt - MQTT client triggering & reporting shutdown on systemd-based systems
 #
 # Copyright (C) 2020 Fabian Peter Hammerle <fabian@hammerle.me>
 #
@@ -29,7 +29,7 @@ setuptools.setup(
         "git_describe_command": "git describe --dirty --tags --long --match v*",
     },
     packages=setuptools.find_packages(),
-    description="MQTT client triggering shutdown on systemd-based systems",
+    description="MQTT client triggering & reporting shutdown on systemd-based systems",
     long_description=pathlib.Path(__file__).parent.joinpath("README.md").read_text(),
     long_description_content_type="text/markdown",
     author="Fabian Peter Hammerle",

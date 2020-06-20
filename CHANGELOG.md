@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - forward logind's [PreparingForShutdown](https://www.freedesktop.org/wiki/Software/systemd/inhibit/)
   to `systemctl/hostname/preparing-for-shutdown`
-- log shutdown [inhibitor locks](https://www.freedesktop.org/wiki/Software/systemd/inhibit/)
+- log [inhibitor locks](https://www.freedesktop.org/wiki/Software/systemd/inhibit/)
+  when scheduling a shutdown
 
 ### Fixed
 - explicit timestamp type specification to avoid
