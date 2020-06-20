@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3ae93e1e2730b28be8018f994cf90486537d216c7ffc5cb3496d87087c4b0bda"
+            "sha256": "48654ce6218ea119cd05b10d6cc14ff27e306885deba781d3265fb0b38d4ad4c"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -247,8 +247,12 @@
             "version": "==2.5.3"
         },
         "pylint-import-requirements": {
-            "git": "https://github.com/fphammerle/pylint-import-requirements",
-            "ref": "857020096167258319ac3f67b34c33525d913ffc"
+            "hashes": [
+                "sha256:bb6056cf68baa25639e59510e5f1deef74d76c684498706675c8c7b6690a63c8",
+                "sha256:d34f4971699487b61c7ebc64aefbf3a33d8d134101eb8bcb9c1d578631fd155f"
+            ],
+            "index": "pypi",
+            "version": "==2.0.3"
         },
         "pyparsing": {
             "hashes": [
