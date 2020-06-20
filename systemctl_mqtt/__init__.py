@@ -24,11 +24,12 @@ import socket
 import typing
 
 import dbus
-import paho.mqtt.client
+import dbus.mainloop.glib
 
 # black keeps inserting a blank line above
 # https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
 import gi.repository.GLib  # pylint-import-requirements: imports=PyGObject
+import paho.mqtt.client
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +46,32 @@ def _get_login_manager() -> dbus.proxies.Interface:
     return dbus.Interface(object=proxy, dbus_interface="org.freedesktop.login1.Manager")
 
 
+def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
+    if _LOGGER.getEffectiveLevel() > logging.DEBUG:
+        return
+    found_inhibitor = False
+    try:
+        # https://www.freedesktop.org/wiki/Software/systemd/inhibit/
+        for what, who, why, mode, uid, pid in login_manager.ListInhibitors():
+            if "shutdown" in what:
+                found_inhibitor = True
+                _LOGGER.debug(
+                    "detected shutdown inhibitor %s (pid=%u, uid=%u, mode=%s): %s",
+                    who,
+                    pid,
+                    uid,
+                    mode,
+                    why,
+                )
+    except dbus.DBusException as exc:
+        _LOGGER.warning(
+            "failed to fetch shutdown inhibitors: %s", exc.get_dbus_message()
+        )
+        return
+    if not found_inhibitor:
+        _LOGGER.debug("no shutdown inhibitor locks found")
+
+
 def _schedule_shutdown(action: str) -> None:
     # https://github.com/systemd/systemd/blob/v237/src/systemctl/systemctl.c#L8553
     assert action in ["poweroff", "reboot"], action
@@ -55,6 +82,7 @@ def _schedule_shutdown(action: str) -> None:
         "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S"),
     )
     shutdown_epoch_usec = int(shutdown_datetime.timestamp() * 10 ** 6)
+    login_manager = _get_login_manager()
     try:
         # $ gdbus introspect --system --dest org.freedesktop.login1 \
         #       --object-path /org/freedesktop/login1 | grep -A 1 ScheduleShutdown
@@ -68,7 +96,7 @@ def _schedule_shutdown(action: str) -> None:
         #       /org/freedesktop/login1 \
         #       org.freedesktop.login1.Manager.ScheduleShutdown \
         #       string:poweroff "uint64:$(date --date=10min +%s)000000"
-        _get_login_manager().ScheduleShutdown(action, shutdown_epoch_usec)
+        login_manager.ScheduleShutdown(action, shutdown_epoch_usec)
     except dbus.DBusException as exc:
         exc_msg = exc.get_dbus_message()
         if "authentication required" in exc_msg.lower():
@@ -78,6 +106,7 @@ def _schedule_shutdown(action: str) -> None:
             )
         else:
             _LOGGER.error("failed to schedule %s: %s", action, exc_msg)
+    _log_shutdown_inhibitors(login_manager)
 
 
 class _Settings:
@@ -174,8 +203,9 @@ def _run(
     # loop_forever attempts to reconnect if disconnected
     # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
     mqtt_client.loop_start()
+    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     try:
-        # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
         gi.repository.GLib.MainLoop().run()
     finally:
         # blocks until loop_forever stops
