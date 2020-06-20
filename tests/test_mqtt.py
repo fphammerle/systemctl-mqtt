@@ -77,8 +77,11 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
     with unittest.mock.patch(
         "paho.mqtt.client.Client.subscribe"
-    ) as mqtt_subscribe_mock:
+    ) as mqtt_subscribe_mock, unittest.mock.patch.object(
+        mqtt_client._userdata, "acquire_shutdown_lock"
+    ) as acquire_shutdown_lock_mock:
         mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
+    acquire_shutdown_lock_mock.assert_called_once_with()
     mqtt_subscribe_mock.assert_called_once_with(mqtt_topic_prefix + "/poweroff")
     assert mqtt_client.on_message is None
     assert (  # pylint: disable=comparison-with-callable
@@ -222,3 +225,22 @@ def test_mqtt_message_callback_poweroff_retained(
     )
     assert caplog.records[1].levelno == logging.INFO
     assert caplog.records[1].message == "ignoring retained message"
+
+
+def test_shutdown_lock():
+    settings = systemctl_mqtt._Settings(mqtt_topic_prefix="any")
+    lock_fd = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ) as get_login_manager_mock:
+        get_login_manager_mock.return_value.Inhibit.return_value = lock_fd
+        settings.acquire_shutdown_lock()
+    get_login_manager_mock.return_value.Inhibit.assert_called_once_with(
+        "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
+    )
+    assert settings._shutdown_lock == lock_fd
+    # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
+    lock_fd.take.return_value = "fdnum"
+    with unittest.mock.patch("os.close") as close_mock:
+        settings.release_shutdown_lock()
+    close_mock.assert_called_once_with("fdnum")

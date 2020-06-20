@@ -19,12 +19,15 @@ import argparse
 import datetime
 import functools
 import logging
+import os
 import pathlib
 import socket
+import threading
 import typing
 
 import dbus
 import dbus.mainloop.glib
+import dbus.types
 
 # black keeps inserting a blank line above
 # https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
@@ -110,15 +113,31 @@ def _schedule_shutdown(action: str) -> None:
 
 
 class _Settings:
-
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, mqtt_topic_prefix: str) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
+        self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
+        self._shutdown_lock_mutex = threading.Lock()
 
     @property
     def mqtt_topic_prefix(self) -> str:
         return self._mqtt_topic_prefix
+
+    def acquire_shutdown_lock(self) -> None:
+        with self._shutdown_lock_mutex:
+            assert self._shutdown_lock is None
+            # https://www.freedesktop.org/wiki/Software/systemd/inhibit/
+            self._shutdown_lock = _get_login_manager().Inhibit(
+                "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
+            )
+            _LOGGER.debug("acquired shutdown inhibitor lock")
+
+    def release_shutdown_lock(self) -> None:
+        with self._shutdown_lock_mutex:
+            if self._shutdown_lock:
+                # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
+                os.close(self._shutdown_lock.take())
+                _LOGGER.debug("released shutdown inhibitor lock")
+                self._shutdown_lock = None
 
 
 class _MQTTAction:
@@ -165,6 +184,7 @@ def _mqtt_on_connect(
     assert return_code == 0, return_code  # connection accepted
     mqtt_broker_host, mqtt_broker_port = mqtt_client.socket().getpeername()
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
+    settings.acquire_shutdown_lock()
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = settings.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
