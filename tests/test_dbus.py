@@ -108,6 +108,7 @@ def test__schedule_shutdown(action):
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == action
+    assert isinstance(schedule_args[1], dbus.UInt64)
     shutdown_datetime = datetime.datetime.fromtimestamp(
         schedule_args[1] / 10 ** 6, tz=_UTC,
     )

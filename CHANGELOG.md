@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `systemctl/hostname/preparing-for-shutdown`
 - log shutdown [inhibitor locks](https://www.freedesktop.org/wiki/Software/systemd/inhibit/)
 
+### Fixed
+- explicit timestamp type specification to avoid
+  `OverflowError: Python int too large to convert to C long`
+
 ## [0.1.1] - 2020-06-18
 ### Fixed
 - compatibility with python3.5:
