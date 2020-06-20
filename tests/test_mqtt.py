@@ -16,8 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+import threading
+import time
 import unittest.mock
 
+import paho.mqtt.client
 import pytest
 from paho.mqtt.client import MQTTMessage
 
@@ -37,7 +40,11 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
         "ssl.SSLContext.wrap_socket", autospec=True,
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
-    ) as mqtt_loop_forever_mock:
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "gi.repository.GLib.MainLoop.run"
+    ) as glib_loop_mock, unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
@@ -60,6 +67,8 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert ssl_context.check_hostname is True
     assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
     # loop started?
+    while threading.active_count() > 1:
+        time.sleep(0.01)
     assert mqtt_loop_forever_mock.call_count == 1
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
     assert mqtt_client._tls_insecure is False
@@ -73,6 +82,11 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
         "paho.mqtt.client.Client.subscribe"
     ) as mqtt_subscribe_mock:
         mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
+    state = mqtt_client._userdata
+    assert (
+        state._login_manager.connect_to_signal.call_args[1]["signal_name"]
+        == "PrepareForShutdown"
+    )
     mqtt_subscribe_mock.assert_called_once_with(mqtt_topic_prefix + "/poweroff")
     assert mqtt_client.on_message is None
     assert (  # pylint: disable=comparison-with-callable
@@ -85,30 +99,23 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert caplog.records[0].message == "connected to MQTT broker {}:{}".format(
         mqtt_host, mqtt_port
     )
-    assert caplog.records[1].levelno == logging.INFO
-    assert caplog.records[1].message == "subscribing to {}".format(
+    assert caplog.records[1].levelno == logging.DEBUG
+    assert caplog.records[1].message == "acquired shutdown inhibitor lock"
+    assert caplog.records[2].levelno == logging.INFO
+    assert caplog.records[2].message == "subscribing to {}".format(
         mqtt_topic_prefix + "/poweroff"
     )
-    assert caplog.records[2].levelno == logging.DEBUG
-    assert caplog.records[2].message == "registered MQTT callback for topic {}".format(
+    assert caplog.records[3].levelno == logging.DEBUG
+    assert caplog.records[3].message == "registered MQTT callback for topic {}".format(
         mqtt_topic_prefix + "/poweroff"
     ) + " triggering {}".format(
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"].action
     )
-    # message callback
-    caplog.clear()
-    poweroff_message = MQTTMessage(topic=mqtt_topic_prefix.encode() + b"/poweroff")
-    with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
-    ) as poweroff_action_mock:
-        mqtt_client._handle_on_message(poweroff_message)
-    poweroff_action_mock.assert_called_once_with()
-    assert all(r.levelno == logging.DEBUG for r in caplog.records)
-    assert caplog.records[0].message == "received topic={} payload=b''".format(
-        poweroff_message.topic
-    )
-    assert caplog.records[1].message.startswith("executing action poweroff")
-    assert caplog.records[2].message.startswith("completed action poweroff")
+    # dbus loop started?
+    glib_loop_mock.assert_called_once_with()
+    # waited for mqtt loop to stop?
+    assert mqtt_client._thread_terminate
+    assert mqtt_client._thread is None
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
@@ -123,7 +130,11 @@ def test__run_authentication(
         "ssl.SSLContext.wrap_socket"
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
         "paho.mqtt.client.Client.loop_forever", autospec=True,
-    ) as mqtt_loop_forever_mock:
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "gi.repository.GLib.MainLoop.run"
+    ), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
@@ -141,11 +152,65 @@ def test__run_authentication(
         assert mqtt_client._password is None
 
 
+def _initialize_mqtt_client(
+    mqtt_host, mqtt_port, mqtt_topic_prefix
+) -> paho.mqtt.client.Client:
+    with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
+        "ssl.SSLContext.wrap_socket",
+    ) as ssl_wrap_socket_mock, unittest.mock.patch(
+        "paho.mqtt.client.Client.loop_forever", autospec=True,
+    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "gi.repository.GLib.MainLoop.run"
+    ), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
+        ssl_wrap_socket_mock.return_value.send = len
+        systemctl_mqtt._run(
+            mqtt_host=mqtt_host,
+            mqtt_port=mqtt_port,
+            mqtt_username=None,
+            mqtt_password=None,
+            mqtt_topic_prefix=mqtt_topic_prefix,
+        )
+    while threading.active_count() > 1:
+        time.sleep(0.01)
+    assert mqtt_loop_forever_mock.call_count == 1
+    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
+    mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
+    mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
+    return mqtt_client
+
+
+@pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
+@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
+def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
+    mqtt_client = _initialize_mqtt_client(
+        mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_topic_prefix=mqtt_topic_prefix
+    )
+    caplog.clear()
+    caplog.set_level(logging.DEBUG)
+    poweroff_message = MQTTMessage(topic=mqtt_topic_prefix.encode() + b"/poweroff")
+    with unittest.mock.patch.object(
+        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
+    ) as poweroff_action_mock:
+        mqtt_client._handle_on_message(poweroff_message)
+    poweroff_action_mock.assert_called_once_with()
+    assert all(r.levelno == logging.DEBUG for r in caplog.records)
+    assert caplog.records[0].message == "received topic={} payload=b''".format(
+        poweroff_message.topic
+    )
+    assert caplog.records[1].message.startswith("executing action poweroff")
+    assert caplog.records[2].message.startswith("completed action poweroff")
+
+
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_password", ["secret"])
 def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_password):
-    with unittest.mock.patch("paho.mqtt.client.Client"):
+    with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager"
+    ):
         with pytest.raises(ValueError):
             systemctl_mqtt._run(
                 mqtt_host=mqtt_host,

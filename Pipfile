@@ -12,7 +12,8 @@ systemctl-mqtt = {editable = true,path = "."}
 black = {version = "==19.10b0", markers = "python_version >= '3.6'"}
 mypy = "*"
 pylint = "*"
-pylint-import-requirements = "*"
+# >=2.0.3 to skip PyGObject's custom loader & fix broken wheel
+pylint-import-requirements = ">=2.0.3"
 pytest = "*"
 pytest-cov = "*"
 
