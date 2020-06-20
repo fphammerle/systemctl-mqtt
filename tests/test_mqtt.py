@@ -80,11 +80,13 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
     with unittest.mock.patch(
         "paho.mqtt.client.Client.subscribe"
-    ) as mqtt_subscribe_mock, unittest.mock.patch.object(
-        mqtt_client._userdata, "acquire_shutdown_lock"
-    ) as acquire_shutdown_lock_mock:
+    ) as mqtt_subscribe_mock:
         mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
-    acquire_shutdown_lock_mock.assert_called_once_with()
+    state = mqtt_client._userdata
+    assert (
+        state._login_manager.connect_to_signal.call_args[1]["signal_name"]
+        == "PrepareForShutdown"
+    )
     mqtt_subscribe_mock.assert_called_once_with(mqtt_topic_prefix + "/poweroff")
     assert mqtt_client.on_message is None
     assert (  # pylint: disable=comparison-with-callable
@@ -97,12 +99,14 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert caplog.records[0].message == "connected to MQTT broker {}:{}".format(
         mqtt_host, mqtt_port
     )
-    assert caplog.records[1].levelno == logging.INFO
-    assert caplog.records[1].message == "subscribing to {}".format(
+    assert caplog.records[1].levelno == logging.DEBUG
+    assert caplog.records[1].message == "acquired shutdown inhibitor lock"
+    assert caplog.records[2].levelno == logging.INFO
+    assert caplog.records[2].message == "subscribing to {}".format(
         mqtt_topic_prefix + "/poweroff"
     )
-    assert caplog.records[2].levelno == logging.DEBUG
-    assert caplog.records[2].message == "registered MQTT callback for topic {}".format(
+    assert caplog.records[3].levelno == logging.DEBUG
+    assert caplog.records[3].message == "registered MQTT callback for topic {}".format(
         mqtt_topic_prefix + "/poweroff"
     ) + " triggering {}".format(
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"].action
