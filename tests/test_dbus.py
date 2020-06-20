@@ -92,12 +92,12 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
     ("topic_suffix", "expected_action_arg"), [("poweroff", "poweroff")]
 )
 def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
-    action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[topic_suffix]
+    mqtt_action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[topic_suffix]
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ):
-        action()
+        mqtt_action.action()
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2

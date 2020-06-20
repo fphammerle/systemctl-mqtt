@@ -77,18 +77,49 @@ def _schedule_shutdown(action: str) -> None:
             _LOGGER.error("failed to schedule %s: %s", action, exc_msg)
 
 
-_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
-    "poweroff": functools.partial(_schedule_shutdown, action="poweroff"),
-}
-
-
 class _Settings:
+
     # pylint: disable=too-few-public-methods
+
     def __init__(self, mqtt_topic_prefix: str) -> None:
-        self.mqtt_topic_action_mapping = {}  # type: typing.Dict[str, typing.Callable]
-        for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
-            topic = mqtt_topic_prefix + "/" + topic_suffix
-            self.mqtt_topic_action_mapping[topic] = action
+        self._mqtt_topic_prefix = mqtt_topic_prefix
+
+    @property
+    def mqtt_topic_prefix(self) -> str:
+        return self._mqtt_topic_prefix
+
+
+class _MQTTAction:
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, name: str, action: typing.Callable) -> None:
+        self.name = name
+        self.action = action
+
+    def mqtt_message_callback(
+        self,
+        mqtt_client: paho.mqtt.client.Client,
+        settings: _Settings,
+        message: paho.mqtt.client.MQTTMessage,
+    ) -> None:
+        # pylint: disable=unused-argument; callback
+        # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L3416
+        # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L469
+        _LOGGER.debug("received topic=%s payload=%r", message.topic, message.payload)
+        if message.retain:
+            _LOGGER.info("ignoring retained message")
+            return
+        _LOGGER.debug("executing action %s (%r)", self.name, self.action)
+        self.action()
+        _LOGGER.debug("completed action %s (%r)", self.name, self.action)
+
+
+_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
+    "poweroff": _MQTTAction(
+        name="poweroff", action=functools.partial(_schedule_shutdown, action="poweroff")
+    ),
+}
 
 
 def _mqtt_on_connect(
@@ -102,30 +133,16 @@ def _mqtt_on_connect(
     assert return_code == 0, return_code  # connection accepted
     mqtt_broker_host, mqtt_broker_port = mqtt_client.socket().getpeername()
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
-    for topic in settings.mqtt_topic_action_mapping.keys():
-        _LOGGER.debug("subscribing to %s", topic)
+    for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
+        topic = settings.mqtt_topic_prefix + "/" + topic_suffix
+        _LOGGER.info("subscribing to %s", topic)
         mqtt_client.subscribe(topic)
-
-
-def _mqtt_on_message(
-    mqtt_client: paho.mqtt.client.Client,
-    settings: _Settings,
-    message: paho.mqtt.client.MQTTMessage,
-) -> None:
-    # pylint: disable=unused-argument; callback
-    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L469
-    _LOGGER.debug("received topic=%s payload=%r", message.topic, message.payload)
-    if message.retain:
-        _LOGGER.info("ignoring retained message")
-        return
-    try:
-        action = settings.mqtt_topic_action_mapping[message.topic]
-    except KeyError:
-        _LOGGER.warning("unexpected topic %s", message.topic)
-        return
-    _LOGGER.debug("executing action %r", action)
-    action()
-    _LOGGER.debug("completed action %r", action)
+        mqtt_client.message_callback_add(
+            sub=topic, callback=action.mqtt_message_callback
+        )
+        _LOGGER.debug(
+            "registered MQTT callback for topic %s triggering %r", topic, action.action
+        )
 
 
 def _run(
@@ -140,7 +157,6 @@ def _run(
         userdata=_Settings(mqtt_topic_prefix=mqtt_topic_prefix)
     )
     mqtt_client.on_connect = _mqtt_on_connect
-    mqtt_client.on_message = _mqtt_on_message
     mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
     _LOGGER.info(
         "connecting to MQTT broker %s:%d", mqtt_host, mqtt_port,
