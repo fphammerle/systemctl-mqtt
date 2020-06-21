@@ -61,6 +61,10 @@ class _State:
     def mqtt_topic_prefix(self) -> str:
         return self._mqtt_topic_prefix
 
+    @property
+    def shutdown_lock_acquired(self) -> bool:
+        return self._shutdown_lock is not None
+
     def acquire_shutdown_lock(self) -> None:
         with self._shutdown_lock_mutex:
             assert self._shutdown_lock is None
@@ -234,7 +238,8 @@ def _mqtt_on_connect(
     assert return_code == 0, return_code  # connection accepted
     mqtt_broker_host, mqtt_broker_port = mqtt_client.socket().getpeername()
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
-    state.acquire_shutdown_lock()
+    if not state.shutdown_lock_acquired:
+        state.acquire_shutdown_lock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client)
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
     state.publish_preparing_for_shutdown_homeassistant_config(mqtt_client=mqtt_client)
@@ -246,7 +251,7 @@ def _mqtt_on_connect(
             sub=topic, callback=action.mqtt_message_callback
         )
         _LOGGER.debug(
-            "registered MQTT callback for topic %s triggering %r", topic, action.action
+            "registered MQTT callback for topic %s triggering %r", topic, action.action,
         )
 
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - home assistant: enable [automatic discovery](https://www.home-assistant.io/docs/mqtt/discovery/#discovery_prefix)
   for logind's `PreparingForShutdown` signal
 
+### Fixed
+- fatal error on MQTT reconnect:
+  tried to re-acquire shutdown inhibitor lock
+
 ## [0.2.0] - 2020-06-21
 ### Added
 - forward logind's [PreparingForShutdown](https://www.freedesktop.org/wiki/Software/systemd/inhibit/)
