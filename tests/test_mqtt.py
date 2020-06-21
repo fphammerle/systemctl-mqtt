@@ -54,7 +54,7 @@ def test__run(
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ) as glib_loop_mock, unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager"
+        "systemctl_mqtt._dbus.get_login_manager"
     ) as get_login_manager_mock:
         ssl_wrap_socket_mock.return_value.send = len
         get_login_manager_mock.return_value.Get.return_value = dbus.Boolean(False)
@@ -160,7 +160,7 @@ def test__run_authentication(
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ), unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager"
+        "systemctl_mqtt._dbus.get_login_manager"
     ):
         ssl_wrap_socket_mock.return_value.send = len
         systemctl_mqtt._run(
@@ -191,7 +191,7 @@ def _initialize_mqtt_client(
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ), unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager"
+        "systemctl_mqtt._dbus.get_login_manager"
     ) as get_login_manager_mock:
         ssl_wrap_socket_mock.return_value.send = len
         get_login_manager_mock.return_value.Get.return_value = dbus.Boolean(False)
@@ -241,7 +241,7 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
 @pytest.mark.parametrize("mqtt_password", ["secret"])
 def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_password):
     with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager"
+        "systemctl_mqtt._dbus.get_login_manager"
     ):
         with pytest.raises(ValueError):
             systemctl_mqtt._run(

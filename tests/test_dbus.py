@@ -22,15 +22,15 @@ import unittest.mock
 import dbus
 import pytest
 
-import systemctl_mqtt
+import systemctl_mqtt._dbus
 
 _UTC = datetime.timezone(offset=datetime.timedelta(seconds=0))
 
 # pylint: disable=protected-access
 
 
-def test__get_login_manager():
-    login_manager = systemctl_mqtt._get_login_manager()
+def test_get_login_manager():
+    login_manager = systemctl_mqtt._dbus.get_login_manager()
     assert isinstance(login_manager, dbus.proxies.Interface)
     assert login_manager.dbus_interface == "org.freedesktop.login1.Manager"
     # https://freedesktop.org/wiki/Software/systemd/logind/
@@ -67,7 +67,7 @@ def test__log_shutdown_inhibitors_some(caplog):
         signature=dbus.Signature("(ssssuu)"),
     )
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 2
     assert caplog.records[0].levelno == logging.DEBUG
     assert (
@@ -81,7 +81,7 @@ def test__log_shutdown_inhibitors_none(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.return_value = dbus.Array([])
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == "no shutdown inhibitor locks found"
@@ -91,7 +91,7 @@ def test__log_shutdown_inhibitors_fail(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.side_effect = dbus.DBusException("mocked")
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.WARNING
     assert caplog.records[0].message == "failed to fetch shutdown inhibitors: mocked"
@@ -101,9 +101,9 @@ def test__log_shutdown_inhibitors_fail(caplog):
 def test__schedule_shutdown(action):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
-        systemctl_mqtt._schedule_shutdown(action=action)
+        systemctl_mqtt._dbus.schedule_shutdown(action=action)
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
@@ -114,7 +114,7 @@ def test__schedule_shutdown(action):
     )
     delay = shutdown_datetime - datetime.datetime.now(tz=_UTC)
     assert delay.total_seconds() == pytest.approx(
-        systemctl_mqtt._SHUTDOWN_DELAY.total_seconds(), abs=0.1,
+        systemctl_mqtt._dbus._SHUTDOWN_DELAY.total_seconds(), abs=0.1,
     )
     assert not schedule_kwargs
 
@@ -136,9 +136,9 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
         exception_message
     )
     with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ), caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._schedule_shutdown(action=action)
+        systemctl_mqtt._dbus.schedule_shutdown(action=action)
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.INFO
@@ -157,7 +157,7 @@ def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
     mqtt_action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[topic_suffix]
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
         mqtt_action.action()
     assert login_manager_mock.ScheduleShutdown.call_count == 1

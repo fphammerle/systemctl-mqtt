@@ -29,7 +29,7 @@ import systemctl_mqtt
 
 def test_shutdown_lock():
     lock_fd = unittest.mock.MagicMock()
-    with unittest.mock.patch("systemctl_mqtt._get_login_manager"):
+    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager"):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
@@ -50,7 +50,7 @@ def test_shutdown_lock():
 
 @pytest.mark.parametrize("active", [True, False])
 def test_prepare_for_shutdown_handler(caplog, active):
-    with unittest.mock.patch("systemctl_mqtt._get_login_manager"):
+    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager"):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
@@ -92,7 +92,7 @@ def test_publish_preparing_for_shutdown(active):
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.return_value = dbus.Boolean(active)
     with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
@@ -118,7 +118,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.side_effect = dbus.DBusException("mocked")
     with unittest.mock.patch(
-        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
