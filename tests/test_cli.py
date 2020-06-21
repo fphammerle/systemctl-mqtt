@@ -21,6 +21,10 @@ import unittest.mock
 import pytest
 
 import systemctl_mqtt
+import systemctl_mqtt._homeassistant
+import systemctl_mqtt._utils
+
+# pylint: disable=protected-access
 
 
 @pytest.mark.parametrize(
@@ -100,7 +104,9 @@ def test__main(
     # pylint: disable=too-many-arguments
     with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
         "sys.argv", argv
-    ), unittest.mock.patch("systemctl_mqtt._get_hostname", return_value="hostname"):
+    ), unittest.mock.patch(
+        "systemctl_mqtt._utils.get_hostname", return_value="hostname"
+    ):
         # pylint: disable=protected-access
         systemctl_mqtt._main()
     run_mock.assert_called_once_with(
@@ -109,6 +115,8 @@ def test__main(
         mqtt_username=expected_username,
         mqtt_password=expected_password,
         mqtt_topic_prefix=expected_topic_prefix or "systemctl/hostname",
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_node_id="hostname",
     )
 
 
@@ -141,7 +149,9 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
             "--mqtt-password-file",
             str(mqtt_password_path),
         ],
-    ), unittest.mock.patch("systemctl_mqtt._get_hostname", return_value="hostname"):
+    ), unittest.mock.patch(
+        "systemctl_mqtt._utils.get_hostname", return_value="hostname"
+    ):
         # pylint: disable=protected-access
         systemctl_mqtt._main()
     run_mock.assert_called_once_with(
@@ -150,6 +160,8 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         mqtt_username="me",
         mqtt_password=expected_password,
         mqtt_topic_prefix="systemctl/hostname",
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_node_id="hostname",
     )
 
 
@@ -179,8 +191,43 @@ def test__main_password_file_collision(capsys):
     )
 
 
-@pytest.mark.parametrize("hostname", ["test"])
-def test__get_hostname(hostname):
-    with unittest.mock.patch("socket.gethostname", return_value=hostname):
-        # pylint: disable=protected-access
-        assert systemctl_mqtt._get_hostname() == hostname
+@pytest.mark.parametrize(
+    ("args", "discovery_prefix"),
+    [
+        ([], "homeassistant"),
+        (["--homeassistant-discovery-prefix", "home/assistant"], "home/assistant"),
+    ],
+)
+def test__main_homeassistant_discovery_prefix(args, discovery_prefix):
+    with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
+        "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
+    ):
+        systemctl_mqtt._main()
+    assert run_mock.call_count == 1
+    assert run_mock.call_args[1]["homeassistant_discovery_prefix"] == discovery_prefix
+
+
+@pytest.mark.parametrize(
+    ("args", "node_id"),
+    [([], "fallback"), (["--homeassistant-node-id", "raspberrypi"], "raspberrypi"),],
+)
+def test__main_homeassistant_node_id(args, node_id):
+    with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
+        "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
+    ), unittest.mock.patch(
+        "systemctl_mqtt._utils.get_hostname", return_value="fallback",
+    ):
+        systemctl_mqtt._main()
+    assert run_mock.call_count == 1
+    assert run_mock.call_args[1]["homeassistant_node_id"] == node_id
+
+
+@pytest.mark.parametrize(
+    "args", [["--homeassistant-node-id", "no pe"], ["--homeassistant-node-id", ""]],
+)
+def test__main_homeassistant_node_id_invalid(args):
+    with unittest.mock.patch(
+        "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
+    ):
+        with pytest.raises(ValueError):
+            systemctl_mqtt._main()

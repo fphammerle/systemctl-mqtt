@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import json
 import logging
 import unittest.mock
 
@@ -29,7 +30,11 @@ import systemctl_mqtt
 def test_shutdown_lock():
     lock_fd = unittest.mock.MagicMock()
     with unittest.mock.patch("systemctl_mqtt._get_login_manager"):
-        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="any",
+            homeassistant_discovery_prefix=None,
+            homeassistant_node_id=None,
+        )
         state._login_manager.Inhibit.return_value = lock_fd
         state.acquire_shutdown_lock()
     state._login_manager.Inhibit.assert_called_once_with(
@@ -46,7 +51,11 @@ def test_shutdown_lock():
 @pytest.mark.parametrize("active", [True, False])
 def test_prepare_for_shutdown_handler(caplog, active):
     with unittest.mock.patch("systemctl_mqtt._get_login_manager"):
-        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="any",
+            homeassistant_discovery_prefix=None,
+            homeassistant_node_id=None,
+        )
     mqtt_client_mock = unittest.mock.MagicMock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client_mock)
     # pylint: disable=no-member,comparison-with-callable
@@ -85,7 +94,11 @@ def test_publish_preparing_for_shutdown(active):
     with unittest.mock.patch(
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ):
-        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="any",
+            homeassistant_discovery_prefix=None,
+            homeassistant_node_id=None,
+        )
     assert state._login_manager == login_manager_mock
     mqtt_client_mock = unittest.mock.MagicMock()
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client_mock)
@@ -107,7 +120,11 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
     with unittest.mock.patch(
         "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
     ):
-        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="any",
+            homeassistant_discovery_prefix=None,
+            homeassistant_node_id=None,
+        )
     mqtt_client_mock = unittest.mock.MagicMock()
     state.publish_preparing_for_shutdown(mqtt_client=None)
     mqtt_client_mock.publish.assert_not_called()
@@ -117,3 +134,42 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
         caplog.records[0].message
         == "failed to read logind's PreparingForShutdown property: mocked"
     )
+
+
+@pytest.mark.parametrize("topic_prefix", ["systemctl/hostname", "hostname/systemctl"])
+@pytest.mark.parametrize("discovery_prefix", ["homeassistant", "home/assistant"])
+@pytest.mark.parametrize("node_id", ["node", "node-id"])
+@pytest.mark.parametrize("hostname", ["hostname", "host-name"])
+def test_publish_preparing_for_shutdown_homeassistant_config(
+    topic_prefix, discovery_prefix, node_id, hostname,
+):
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=topic_prefix,
+        homeassistant_discovery_prefix=discovery_prefix,
+        homeassistant_node_id=node_id,
+    )
+    mqtt_client = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "systemctl_mqtt._utils.get_hostname", return_value=hostname
+    ):
+        state.publish_preparing_for_shutdown_homeassistant_config(
+            mqtt_client=mqtt_client
+        )
+    assert mqtt_client.publish.call_count == 1
+    publish_args, publish_kwargs = mqtt_client.publish.call_args
+    assert not publish_args
+    assert publish_kwargs["retain"]
+    assert (
+        publish_kwargs["topic"]
+        == discovery_prefix
+        + "/binary_sensor/"
+        + node_id
+        + "/preparing-for-shutdown/config"
+    )
+    assert json.loads(publish_kwargs["payload"]) == {
+        "unique_id": "systemctl-mqtt/" + node_id + "/logind/preparing-for-shutdown",
+        "state_topic": topic_prefix + "/preparing-for-shutdown",
+        "payload_on": "true",
+        "payload_off": "false",
+        "name": node_id + " preparing for shutdown",
+    }

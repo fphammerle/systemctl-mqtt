@@ -35,6 +35,9 @@ import dbus.types
 import gi.repository.GLib  # pylint-import-requirements: imports=PyGObject
 import paho.mqtt.client
 
+import systemctl_mqtt._homeassistant
+import systemctl_mqtt._mqtt
+
 _LOGGER = logging.getLogger(__name__)
 
 _SHUTDOWN_DELAY = datetime.timedelta(seconds=4)
@@ -115,8 +118,15 @@ def _schedule_shutdown(action: str) -> None:
 
 
 class _State:
-    def __init__(self, mqtt_topic_prefix: str) -> None:
+    def __init__(
+        self,
+        mqtt_topic_prefix: str,
+        homeassistant_discovery_prefix: str,
+        homeassistant_node_id: str,
+    ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
+        self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
+        self._homeassistant_node_id = homeassistant_node_id
         self._login_manager = _get_login_manager()  # type: dbus.proxies.Interface
         self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
         self._shutdown_lock_mutex = threading.Lock()
@@ -142,12 +152,17 @@ class _State:
                 _LOGGER.debug("released shutdown inhibitor lock")
                 self._shutdown_lock = None
 
+    @property
+    def _preparing_for_shutdown_topic(self) -> str:
+        return self.mqtt_topic_prefix + "/preparing-for-shutdown"
+
     def _publish_preparing_for_shutdown(
         self, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool,
     ) -> None:
         # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1199
-        topic = self.mqtt_topic_prefix + "/preparing-for-shutdown"
-        payload = json.dumps(active)
+        topic = self._preparing_for_shutdown_topic
+        # pylint: disable=protected-access
+        payload = systemctl_mqtt._mqtt.encode_bool(active)
         _LOGGER.info("publishing %r on %s", payload, topic)
         msg_info = mqtt_client.publish(
             topic=topic, payload=payload, retain=True,
@@ -206,6 +221,43 @@ class _State:
             block=False,
         )
 
+    def publish_preparing_for_shutdown_homeassistant_config(
+        self, mqtt_client: paho.mqtt.client.Client
+    ) -> None:
+        # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
+        # https://www.home-assistant.io/docs/mqtt/discovery/
+        discovery_topic = "/".join(
+            (
+                self._homeassistant_discovery_prefix,
+                "binary_sensor",
+                self._homeassistant_node_id,
+                "preparing-for-shutdown",
+                "config",
+            )
+        )
+        unique_id = "/".join(
+            (
+                "systemctl-mqtt",
+                self._homeassistant_node_id,
+                "logind",
+                "preparing-for-shutdown",
+            )
+        )
+        # https://www.home-assistant.io/integrations/binary_sensor.mqtt/#configuration-variables
+        config = {
+            "unique_id": unique_id,
+            "state_topic": self._preparing_for_shutdown_topic,
+            # pylint: disable=protected-access
+            "payload_on": systemctl_mqtt._mqtt.encode_bool(True),
+            "payload_off": systemctl_mqtt._mqtt.encode_bool(False),
+            # friendly_name & template for default entity_id
+            "name": "{} preparing for shutdown".format(self._homeassistant_node_id),
+        }
+        _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
+        mqtt_client.publish(
+            topic=discovery_topic, payload=json.dumps(config), retain=True,
+        )
+
 
 class _MQTTAction:
 
@@ -254,6 +306,7 @@ def _mqtt_on_connect(
     state.acquire_shutdown_lock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client)
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
+    state.publish_preparing_for_shutdown_homeassistant_config(mqtt_client=mqtt_client)
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
@@ -272,12 +325,19 @@ def _run(
     mqtt_username: typing.Optional[str],
     mqtt_password: typing.Optional[str],
     mqtt_topic_prefix: str,
+    homeassistant_discovery_prefix: str,
+    homeassistant_node_id: str,
 ) -> None:
+    # pylint: disable=too-many-arguments
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     # https://pypi.org/project/paho-mqtt/
     mqtt_client = paho.mqtt.client.Client(
-        userdata=_State(mqtt_topic_prefix=mqtt_topic_prefix)
+        userdata=_State(
+            mqtt_topic_prefix=mqtt_topic_prefix,
+            homeassistant_discovery_prefix=homeassistant_discovery_prefix,
+            homeassistant_node_id=homeassistant_node_id,
+        )
     )
     mqtt_client.on_connect = _mqtt_on_connect
     mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
@@ -303,10 +363,6 @@ def _run(
         _LOGGER.debug("MQTT loop stopped")
 
 
-def _get_hostname() -> str:
-    return socket.gethostname()
-
-
 def _main() -> None:
     logging.basicConfig(
         level=logging.DEBUG,
@@ -329,12 +385,23 @@ def _main() -> None:
         dest="mqtt_password_path",
         help="stripping trailing newline",
     )
-    # https://www.home-assistant.io/docs/mqtt/discovery/#discovery_prefix
     argparser.add_argument(
         "--mqtt-topic-prefix",
         type=str,
-        default="systemctl/" + _get_hostname(),
+        # pylint: disable=protected-access
+        default="systemctl/" + systemctl_mqtt._utils.get_hostname(),
         help=" ",  # show default
+    )
+    # https://www.home-assistant.io/docs/mqtt/discovery/#discovery_prefix
+    argparser.add_argument(
+        "--homeassistant-discovery-prefix", type=str, default="homeassistant", help=" ",
+    )
+    argparser.add_argument(
+        "--homeassistant-node-id",
+        type=str,
+        # pylint: disable=protected-access
+        default=systemctl_mqtt._homeassistant.get_default_node_id(),
+        help=" ",
     )
     args = argparser.parse_args()
     if args.mqtt_password_path:
@@ -346,10 +413,22 @@ def _main() -> None:
             mqtt_password = mqtt_password[:-1]
     else:
         mqtt_password = args.mqtt_password
+    # pylint: disable=protected-access
+    if not systemctl_mqtt._homeassistant.validate_node_id(args.homeassistant_node_id):
+        raise ValueError(
+            "invalid home assistant node id {!r} (length >= 1, allowed characters: {})".format(
+                args.homeassistant_node_id,
+                # pylint: disable=protected-access
+                systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS,
+            )
+            + "\nchange --homeassistant-node-id"
+        )
     _run(
         mqtt_host=args.mqtt_host,
         mqtt_port=args.mqtt_port,
         mqtt_username=args.mqtt_username,
         mqtt_password=mqtt_password,
         mqtt_topic_prefix=args.mqtt_topic_prefix,
+        homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
+        homeassistant_node_id=args.homeassistant_node_id,
     )

@@ -33,7 +33,17 @@ import systemctl_mqtt
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
-def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
+@pytest.mark.parametrize("homeassistant_discovery_prefix", ["homeassistant"])
+@pytest.mark.parametrize("homeassistant_node_id", ["host", "node"])
+def test__run(
+    caplog,
+    mqtt_host,
+    mqtt_port,
+    mqtt_topic_prefix,
+    homeassistant_discovery_prefix,
+    homeassistant_node_id,
+):
+    # pylint: disable=too-many-locals,too-many-arguments
     caplog.set_level(logging.DEBUG)
     with unittest.mock.patch(
         "socket.create_connection"
@@ -54,6 +64,8 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
             mqtt_username=None,
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
+            homeassistant_discovery_prefix=homeassistant_discovery_prefix,
+            homeassistant_node_id=homeassistant_node_id,
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == "connecting to MQTT broker {}:{}".format(
@@ -107,12 +119,21 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert caplog.records[2].message == "publishing 'false' on {}".format(
         mqtt_topic_prefix + "/preparing-for-shutdown"
     )
-    assert caplog.records[3].levelno == logging.INFO
-    assert caplog.records[3].message == "subscribing to {}".format(
+    assert caplog.records[3].levelno == logging.DEBUG
+    assert (
+        caplog.records[3].message
+        == "publishing home assistant config on "
+        + homeassistant_discovery_prefix
+        + "/binary_sensor/"
+        + homeassistant_node_id
+        + "/preparing-for-shutdown/config"
+    )
+    assert caplog.records[4].levelno == logging.INFO
+    assert caplog.records[4].message == "subscribing to {}".format(
         mqtt_topic_prefix + "/poweroff"
     )
-    assert caplog.records[4].levelno == logging.DEBUG
-    assert caplog.records[4].message == "registered MQTT callback for topic {}".format(
+    assert caplog.records[5].levelno == logging.DEBUG
+    assert caplog.records[5].message == "registered MQTT callback for topic {}".format(
         mqtt_topic_prefix + "/poweroff"
     ) + " triggering {}".format(
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"].action
@@ -148,6 +169,8 @@ def test__run_authentication(
             mqtt_username=mqtt_username,
             mqtt_password=mqtt_password,
             mqtt_topic_prefix=mqtt_topic_prefix,
+            homeassistant_discovery_prefix="discovery-prefix",
+            homeassistant_node_id="node-id",
         )
     assert mqtt_loop_forever_mock.call_count == 1
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
@@ -178,6 +201,8 @@ def _initialize_mqtt_client(
             mqtt_username=None,
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
+            homeassistant_discovery_prefix="discovery-prefix",
+            homeassistant_node_id="node-id",
         )
     while threading.active_count() > 1:
         time.sleep(0.01)
@@ -225,6 +250,8 @@ def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_passwor
                 mqtt_username=None,
                 mqtt_password=mqtt_password,
                 mqtt_topic_prefix="prefix",
+                homeassistant_discovery_prefix="discovery-prefix",
+                homeassistant_node_id="node-id",
             )
 
 
