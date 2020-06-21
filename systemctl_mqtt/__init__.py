@@ -143,15 +143,17 @@ class _State:
                 self._shutdown_lock = None
 
     def _publish_preparing_for_shutdown(
-        self, mqtt_client: paho.mqtt.client.Client, active: bool
+        self, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool,
     ) -> None:
         # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1199
         topic = self.mqtt_topic_prefix + "/preparing-for-shutdown"
         payload = json.dumps(active)
         _LOGGER.info("publishing %r on %s", payload, topic)
         msg_info = mqtt_client.publish(
-            topic=topic, payload=payload,
+            topic=topic, payload=payload, retain=True,
         )  # type: paho.mqtt.client.MQTTMessageInfo
+        if not block:
+            return
         msg_info.wait_for_publish()
         if msg_info.rc != paho.mqtt.client.MQTT_ERR_SUCCESS:
             _LOGGER.error(
@@ -163,7 +165,9 @@ class _State:
     ) -> None:
         assert isinstance(active, dbus.Boolean)
         active = bool(active)
-        self._publish_preparing_for_shutdown(mqtt_client=mqtt_client, active=active)
+        self._publish_preparing_for_shutdown(
+            mqtt_client=mqtt_client, active=active, block=True,
+        )
         if active:
             self.release_shutdown_lock()
         else:
@@ -177,6 +181,29 @@ class _State:
             handler_function=functools.partial(
                 self._prepare_for_shutdown_handler, mqtt_client=mqtt_client
             ),
+        )
+
+    def publish_preparing_for_shutdown(
+        self, mqtt_client: paho.mqtt.client.Client,
+    ) -> None:
+        try:
+            active = self._login_manager.Get(
+                "org.freedesktop.login1.Manager",
+                "PreparingForShutdown",
+                dbus_interface="org.freedesktop.DBus.Properties",
+            )
+        except dbus.DBusException as exc:
+            _LOGGER.error(
+                "failed to read logind's PreparingForShutdown property: %s",
+                exc.get_dbus_message(),
+            )
+            return
+        assert isinstance(active, dbus.Boolean), active
+        self._publish_preparing_for_shutdown(
+            mqtt_client=mqtt_client,
+            active=bool(active),
+            # https://github.com/eclipse/paho.mqtt.python/issues/439#issuecomment-565514393
+            block=False,
         )
 
 
@@ -226,6 +253,7 @@ def _mqtt_on_connect(
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
     state.acquire_shutdown_lock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client)
+    state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)

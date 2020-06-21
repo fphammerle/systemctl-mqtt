@@ -67,7 +67,9 @@ def test_prepare_for_shutdown_handler(caplog, active):
         acquire_lock_mock.assert_called_once_with()
         release_lock_mock.assert_not_called()
     mqtt_client_mock.publish.assert_called_once_with(
-        topic="any/preparing-for-shutdown", payload="true" if active else "false",
+        topic="any/preparing-for-shutdown",
+        payload="true" if active else "false",
+        retain=True,
     )
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.ERROR
