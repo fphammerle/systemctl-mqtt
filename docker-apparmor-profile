@@ -58,4 +58,10 @@ profile systemctl-mqtt flags=(attach_disconnected) {
        interface=org.freedesktop.login1.Manager
        member=PrepareForShutdown
        peer=(label=unconfined),
+  dbus (send)
+       bus=system
+       path=/org/freedesktop/login1
+       interface=org.freedesktop.DBus.Properties
+       member=Get
+       peer=(label=unconfined),
 }

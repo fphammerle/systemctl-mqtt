@@ -20,6 +20,7 @@ import threading
 import time
 import unittest.mock
 
+import dbus
 import paho.mqtt.client
 import pytest
 from paho.mqtt.client import MQTTMessage
@@ -44,8 +45,9 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
         "gi.repository.GLib.MainLoop.run"
     ) as glib_loop_mock, unittest.mock.patch(
         "systemctl_mqtt._get_login_manager"
-    ):
+    ) as get_login_manager_mock:
         ssl_wrap_socket_mock.return_value.send = len
+        get_login_manager_mock.return_value.Get.return_value = dbus.Boolean(False)
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -102,11 +104,15 @@ def test__run(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
     assert caplog.records[1].levelno == logging.DEBUG
     assert caplog.records[1].message == "acquired shutdown inhibitor lock"
     assert caplog.records[2].levelno == logging.INFO
-    assert caplog.records[2].message == "subscribing to {}".format(
+    assert caplog.records[2].message == "publishing 'false' on {}".format(
+        mqtt_topic_prefix + "/preparing-for-shutdown"
+    )
+    assert caplog.records[3].levelno == logging.INFO
+    assert caplog.records[3].message == "subscribing to {}".format(
         mqtt_topic_prefix + "/poweroff"
     )
-    assert caplog.records[3].levelno == logging.DEBUG
-    assert caplog.records[3].message == "registered MQTT callback for topic {}".format(
+    assert caplog.records[4].levelno == logging.DEBUG
+    assert caplog.records[4].message == "registered MQTT callback for topic {}".format(
         mqtt_topic_prefix + "/poweroff"
     ) + " triggering {}".format(
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"].action
@@ -163,8 +169,9 @@ def _initialize_mqtt_client(
         "gi.repository.GLib.MainLoop.run"
     ), unittest.mock.patch(
         "systemctl_mqtt._get_login_manager"
-    ):
+    ) as get_login_manager_mock:
         ssl_wrap_socket_mock.return_value.send = len
+        get_login_manager_mock.return_value.Get.return_value = dbus.Boolean(False)
         systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
