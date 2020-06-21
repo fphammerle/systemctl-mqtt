@@ -26,6 +26,9 @@ profile systemctl-mqtt flags=(attach_disconnected) {
   /systemctl-mqtt/ r,
   /systemctl-mqtt/** r,
   /systemctl-mqtt/.venv/lib/python3.8/site-packages/_dbus_bindings.so m,
+  /systemctl-mqtt/.venv/lib/python3.8/site-packages/_dbus_glib_bindings.so m,
+  /systemctl-mqtt/.venv/lib/python3.8/site-packages/gi/_gi.cpython-38-x86_64-linux-gnu.so m,
+  /systemctl-mqtt/.venv/lib/python3.8/site-packages/gi/_gi_cairo.cpython-38-x86_64-linux-gnu.so m,
   # https://presentations.nordisch.org/apparmor/#/25
   /systemctl-mqtt/.venv/bin/systemctl-mqtt rix,
   /etc/** r,
@@ -47,6 +50,12 @@ profile systemctl-mqtt flags=(attach_disconnected) {
        bus=system
        path=/org/freedesktop/login1
        interface=org.freedesktop.login1.Manager
-       member=ScheduleShutdown
+       member={Inhibit,ListInhibitors,ScheduleShutdown}
+       peer=(label=unconfined),
+  dbus (receive)
+       bus=system
+       path=/org/freedesktop/login1
+       interface=org.freedesktop.login1.Manager
+       member=PrepareForShutdown
        peer=(label=unconfined),
 }
