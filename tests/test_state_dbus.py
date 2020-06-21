@@ -76,3 +76,44 @@ def test_prepare_for_shutdown_handler(caplog, active):
     assert caplog.records[0].message.startswith(
         "failed to publish on any/preparing-for-shutdown"
     )
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_publish_preparing_for_shutdown(active):
+    login_manager_mock = unittest.mock.MagicMock()
+    login_manager_mock.Get.return_value = dbus.Boolean(active)
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+    ):
+        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+    assert state._login_manager == login_manager_mock
+    mqtt_client_mock = unittest.mock.MagicMock()
+    state.publish_preparing_for_shutdown(mqtt_client=mqtt_client_mock)
+    login_manager_mock.Get.assert_called_once_with(
+        "org.freedesktop.login1.Manager",
+        "PreparingForShutdown",
+        dbus_interface="org.freedesktop.DBus.Properties",
+    )
+    mqtt_client_mock.publish.assert_called_once_with(
+        topic="any/preparing-for-shutdown",
+        payload="true" if active else "false",
+        retain=True,
+    )
+
+
+def test_publish_preparing_for_shutdown_get_fail(caplog):
+    login_manager_mock = unittest.mock.MagicMock()
+    login_manager_mock.Get.side_effect = dbus.DBusException("mocked")
+    with unittest.mock.patch(
+        "systemctl_mqtt._get_login_manager", return_value=login_manager_mock
+    ):
+        state = systemctl_mqtt._State(mqtt_topic_prefix="any")
+    mqtt_client_mock = unittest.mock.MagicMock()
+    state.publish_preparing_for_shutdown(mqtt_client=None)
+    mqtt_client_mock.publish.assert_not_called()
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert (
+        caplog.records[0].message
+        == "failed to read logind's PreparingForShutdown property: mocked"
+    )
