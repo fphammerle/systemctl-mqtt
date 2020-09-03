@@ -25,7 +25,8 @@ services:
     security_opt:
     - no-new-privileges
     # $ sudo apparmor_parser --replace ./docker-apparmor-profile
-    # raspberrypi kernel apparmor: https://github.com/raspberrypi/linux/pull/1698
+    # raspberrypi kernel apparmor: https://github.com/raspberrypi/linux/pull/1698#issuecomment-684989048
+    # https://github.com/raspberrypi/linux/commit/a3e07c5dfef2664fc1d900ebb4a3f91c04ab700b
     - apparmor=systemctl-mqtt
     # docker-compose >=2.2,<3
     cpus: 0.4
