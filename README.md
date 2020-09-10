@@ -101,6 +101,11 @@ Pre-built docker image are available at https://hub.docker.com/r/fphammerle/syst
 
 Annotation of signed tags `docker/*` contains docker image digests: https://github.com/fphammerle/systemctl-mqtt/tags
 
+## MQTT via TLS
+
+TLS is enabled by default.
+Run `systemctl-mqtt --mqtt-disable-tls …` to disable TLS.
+
 ## MQTT Authentication
 
 ```sh

@@ -68,8 +68,8 @@ def test__run(
             homeassistant_node_id=homeassistant_node_id,
         )
     assert caplog.records[0].levelno == logging.INFO
-    assert caplog.records[0].message == "connecting to MQTT broker {}:{}".format(
-        mqtt_host, mqtt_port
+    assert caplog.records[0].message == (
+        "connecting to MQTT broker {}:{} (TLS enabled)".format(mqtt_host, mqtt_port)
     )
     # correct remote?
     assert create_socket_mock.call_count == 1
@@ -143,6 +143,54 @@ def test__run(
     # waited for mqtt loop to stop?
     assert mqtt_client._thread_terminate
     assert mqtt_client._thread is None
+
+
+@pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
+@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_disable_tls", [True, False])
+def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
+    caplog.set_level(logging.INFO)
+    with unittest.mock.patch(
+        "paho.mqtt.client.Client"
+    ) as mqtt_client_class, unittest.mock.patch("gi.repository.GLib.MainLoop.run"):
+        systemctl_mqtt._run(
+            mqtt_host=mqtt_host,
+            mqtt_port=mqtt_port,
+            mqtt_disable_tls=mqtt_disable_tls,
+            mqtt_username=None,
+            mqtt_password=None,
+            mqtt_topic_prefix="systemctl/hosts",
+            homeassistant_discovery_prefix="homeassistant",
+            homeassistant_node_id="host",
+        )
+    assert caplog.records[0].levelno == logging.INFO
+    assert caplog.records[0].message == (
+        "connecting to MQTT broker {}:{} (TLS {})".format(
+            mqtt_host, mqtt_port, "disabled" if mqtt_disable_tls else "enabled"
+        )
+    )
+    if mqtt_disable_tls:
+        mqtt_client_class().tls_set.assert_not_called()
+    else:
+        mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
+
+
+def test__run_tls_default():
+    with unittest.mock.patch(
+        "paho.mqtt.client.Client"
+    ) as mqtt_client_class, unittest.mock.patch("gi.repository.GLib.MainLoop.run"):
+        systemctl_mqtt._run(
+            mqtt_host="mqtt-broker.local",
+            mqtt_port=1833,
+            # mqtt_disable_tls default,
+            mqtt_username=None,
+            mqtt_password=None,
+            mqtt_topic_prefix="systemctl/hosts",
+            homeassistant_discovery_prefix="homeassistant",
+            homeassistant_node_id="host",
+        )
+    # enabled by default
+    mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])

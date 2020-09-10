@@ -38,6 +38,9 @@ import systemctl_mqtt._dbus
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._mqtt
 
+_MQTT_DEFAULT_PORT = 1883
+_MQTT_DEFAULT_TLS_PORT = 8883
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -263,6 +266,7 @@ def _run(
     mqtt_topic_prefix: str,
     homeassistant_discovery_prefix: str,
     homeassistant_node_id: str,
+    mqtt_disable_tls: bool = False,
 ) -> None:
     # pylint: disable=too-many-arguments
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
@@ -276,9 +280,13 @@ def _run(
         )
     )
     mqtt_client.on_connect = _mqtt_on_connect
-    mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
+    if not mqtt_disable_tls:
+        mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
     _LOGGER.info(
-        "connecting to MQTT broker %s:%d", mqtt_host, mqtt_port,
+        "connecting to MQTT broker %s:%d (TLS %s)",
+        mqtt_host,
+        mqtt_port,
+        "disabled" if mqtt_disable_tls else "enabled",
     )
     if mqtt_username:
         mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
@@ -310,8 +318,15 @@ def _main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)
-    argparser.add_argument("--mqtt-port", type=int, default=8883)
+    argparser.add_argument(
+        "--mqtt-port",
+        type=int,
+        help="default {} ({} with --mqtt-disable-tls)".format(
+            _MQTT_DEFAULT_TLS_PORT, _MQTT_DEFAULT_PORT
+        ),
+    )
     argparser.add_argument("--mqtt-username", type=str)
+    argparser.add_argument("--mqtt-disable-tls", action="store_true")
     password_argument_group = argparser.add_mutually_exclusive_group()
     password_argument_group.add_argument("--mqtt-password", type=str)
     password_argument_group.add_argument(
@@ -340,6 +355,12 @@ def _main() -> None:
         help=" ",
     )
     args = argparser.parse_args()
+    if args.mqtt_port:
+        mqtt_port = args.mqtt_port
+    elif args.mqtt_disable_tls:
+        mqtt_port = _MQTT_DEFAULT_PORT
+    else:
+        mqtt_port = _MQTT_DEFAULT_TLS_PORT
     if args.mqtt_password_path:
         # .read_text() replaces \r\n with \n
         mqtt_password = args.mqtt_password_path.read_bytes().decode()
@@ -361,7 +382,8 @@ def _main() -> None:
         )
     _run(
         mqtt_host=args.mqtt_host,
-        mqtt_port=args.mqtt_port,
+        mqtt_port=mqtt_port,
+        mqtt_disable_tls=args.mqtt_disable_tls,
         mqtt_username=args.mqtt_username,
         mqtt_password=mqtt_password,
         mqtt_topic_prefix=args.mqtt_topic_prefix,
