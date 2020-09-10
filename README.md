@@ -5,6 +5,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/fphammerle/systemctl-mqtt/badge.svg?branch=master)](https://coveralls.io/github/fphammerle/systemctl-mqtt?branch=master)
 [![Last Release](https://img.shields.io/pypi/v/systemctl-mqtt.svg)](https://pypi.org/project/systemctl-mqtt/#history)
 [![Compatible Python Versions](https://img.shields.io/pypi/pyversions/systemctl-mqtt.svg)](https://pypi.org/project/systemctl-mqtt/)
+[![DOI](https://zenodo.org/badge/272405671.svg)](https://zenodo.org/badge/latestdoi/272405671)
 
 MQTT client triggering & reporting shutdown on [systemd](https://freedesktop.org/wiki/Software/systemd/)-based systems
 
