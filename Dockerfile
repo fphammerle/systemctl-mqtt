@@ -4,6 +4,7 @@ ARG BASE_IMAGE=alpine:3.11
 ARG SOURCE_DIR_PATH=/systemctl-mqtt
 
 
+# hadolint ignore=DL3006
 FROM $BASE_IMAGE as build
 
 RUN apk add --no-cache \
@@ -38,8 +39,10 @@ RUN pipenv install --deploy --verbose \
 # > failed to copy files: failed to copy directory: Error processing tar file(exit status 1): Container ID ... cannot be mapped to a host ID
 USER 0
 RUN chown -R 0:0 $SOURCE_DIR_PATH
+USER build
 
 
+# hadolint ignore=DL3006
 FROM $BASE_IMAGE
 
 RUN apk add --no-cache \
