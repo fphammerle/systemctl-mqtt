@@ -31,3 +31,5 @@ typed-ast = "*"
 
 [requires]
 python_version = "3"
+
+# Pipfile syntax: https://github.com/pypa/pipfile#pipfile
