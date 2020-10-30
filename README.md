@@ -81,7 +81,7 @@ home assistant will automatically detect a new entity
 ```yaml
 mqtt:
   broker: BROKER_HOSTNAME_OR_IP_ADDRESS
-  discovery: true
+  discovery: true # default in home assistant >=v0.117.0
   # credentials, additional options…
 ```
 
