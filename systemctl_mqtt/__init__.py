@@ -199,7 +199,7 @@ class _State:
 class _MQTTAction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def trigger(self, state: _State) -> None:
-        pass # pragma: no cover
+        pass  # pragma: no cover
 
     def mqtt_message_callback(
         self,
@@ -360,6 +360,9 @@ def _main() -> None:
         default=systemctl_mqtt._homeassistant.get_default_node_id(),
         help=" ",
     )
+    argparser.add_argument(
+        "--poweroff-delay-seconds", type=float, default=4.0, help=" ",
+    )
     args = argparser.parse_args()
     if args.mqtt_port:
         mqtt_port = args.mqtt_port
@@ -395,5 +398,5 @@ def _main() -> None:
         mqtt_topic_prefix=args.mqtt_topic_prefix,
         homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
         homeassistant_node_id=args.homeassistant_node_id,
-        poweroff_delay=datetime.timedelta(seconds=4),
+        poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
     )
