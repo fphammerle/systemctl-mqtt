@@ -48,9 +48,11 @@ _LOGGER = logging.getLogger(__name__)
 class _State:
     def __init__(
         self,
+        *,
         mqtt_topic_prefix: str,
         homeassistant_discovery_prefix: str,
         homeassistant_node_id: str,
+        poweroff_delay: datetime.timedelta,
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
@@ -60,6 +62,7 @@ class _State:
         )  # type: dbus.proxies.Interface
         self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
         self._shutdown_lock_mutex = threading.Lock()
+        self.poweroff_delay = poweroff_delay
 
     @property
     def mqtt_topic_prefix(self) -> str:
@@ -195,8 +198,8 @@ class _State:
 
 class _MQTTAction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def trigger(self) -> None:
-        pass
+    def trigger(self, state: _State) -> None:
+        pass # pragma: no cover
 
     def mqtt_message_callback(
         self,
@@ -212,26 +215,22 @@ class _MQTTAction(metaclass=abc.ABCMeta):
             _LOGGER.info("ignoring retained message")
             return
         _LOGGER.debug("executing action %s", self)
-        self.trigger()
+        self.trigger(state=state)
         _LOGGER.debug("completed action %s", self)
 
 
 class _MQTTActionSchedulePoweroff(_MQTTAction):
-    def __init__(self, delay: datetime.timedelta) -> None:
-        super().__init__()
-        self._delay = delay
-
-    def trigger(self) -> None:
+    def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
-        systemctl_mqtt._dbus.schedule_shutdown(action="poweroff", delay=self._delay)
+        systemctl_mqtt._dbus.schedule_shutdown(
+            action="poweroff", delay=state.poweroff_delay
+        )
 
     def __str__(self) -> str:
         return type(self).__name__
 
 
-_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
-    "poweroff": _MQTTActionSchedulePoweroff(delay=datetime.timedelta(seconds=4))
-}
+_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {"poweroff": _MQTTActionSchedulePoweroff()}
 
 
 def _mqtt_on_connect(
@@ -263,6 +262,7 @@ def _mqtt_on_connect(
 
 
 def _run(
+    *,
     mqtt_host: str,
     mqtt_port: int,
     mqtt_username: typing.Optional[str],
@@ -270,6 +270,7 @@ def _run(
     mqtt_topic_prefix: str,
     homeassistant_discovery_prefix: str,
     homeassistant_node_id: str,
+    poweroff_delay: datetime.timedelta,
     mqtt_disable_tls: bool = False,
 ) -> None:
     # pylint: disable=too-many-arguments
@@ -281,6 +282,7 @@ def _run(
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix=homeassistant_discovery_prefix,
             homeassistant_node_id=homeassistant_node_id,
+            poweroff_delay=poweroff_delay,
         )
     )
     mqtt_client.on_connect = _mqtt_on_connect
@@ -393,4 +395,5 @@ def _main() -> None:
         mqtt_topic_prefix=args.mqtt_topic_prefix,
         homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
         homeassistant_node_id=args.homeassistant_node_id,
+        poweroff_delay=datetime.timedelta(seconds=4),
     )

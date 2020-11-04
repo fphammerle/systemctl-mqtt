@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import datetime
 import typing
 import unittest.mock
 
@@ -159,11 +160,12 @@ def test__main(
         mqtt_topic_prefix=expected_topic_prefix or "systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
         homeassistant_node_id="hostname",
+        poweroff_delay=datetime.timedelta(seconds=4),
     )
 
 
 @pytest.mark.parametrize(
-    ("password_file_content", "expected_password",),
+    ("password_file_content", "expected_password"),
     [
         ("secret", "secret"),
         ("secret space", "secret space"),
@@ -205,6 +207,7 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         mqtt_topic_prefix="systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
         homeassistant_node_id="hostname",
+        poweroff_delay=datetime.timedelta(seconds=4),
     )
 
 

@@ -160,7 +160,14 @@ def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
-        mqtt_action.trigger()
+        mqtt_action.trigger(
+            state=systemctl_mqtt._State(
+                mqtt_topic_prefix="systemctl/hostname",
+                homeassistant_discovery_prefix="homeassistant",
+                homeassistant_node_id="node",
+                poweroff_delay=datetime.timedelta(),
+            )
+        )
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2

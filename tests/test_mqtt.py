@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import datetime
 import logging
 import threading
 import time
@@ -66,6 +67,7 @@ def test__run(
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix=homeassistant_discovery_prefix,
             homeassistant_node_id=homeassistant_node_id,
+            poweroff_delay=datetime.timedelta(),
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
@@ -162,6 +164,7 @@ def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
             mqtt_topic_prefix="systemctl/hosts",
             homeassistant_discovery_prefix="homeassistant",
             homeassistant_node_id="host",
+            poweroff_delay=datetime.timedelta(),
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
@@ -188,6 +191,7 @@ def test__run_tls_default():
             mqtt_topic_prefix="systemctl/hosts",
             homeassistant_discovery_prefix="homeassistant",
             homeassistant_node_id="host",
+            poweroff_delay=datetime.timedelta(),
         )
     # enabled by default
     mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
@@ -219,6 +223,7 @@ def test__run_authentication(
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix="discovery-prefix",
             homeassistant_node_id="node-id",
+            poweroff_delay=datetime.timedelta(),
         )
     assert mqtt_loop_forever_mock.call_count == 1
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
@@ -251,6 +256,7 @@ def _initialize_mqtt_client(
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix="discovery-prefix",
             homeassistant_node_id="node-id",
+            poweroff_delay=datetime.timedelta(),
         )
     while threading.active_count() > 1:
         time.sleep(0.01)
@@ -275,7 +281,7 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
     ) as poweroff_trigger_mock:
         mqtt_client._handle_on_message(poweroff_message)
-    poweroff_trigger_mock.assert_called_once_with()
+    poweroff_trigger_mock.assert_called_once_with(state=mqtt_client._userdata)
     assert all(r.levelno == logging.DEBUG for r in caplog.records)
     assert caplog.records[0].message == "received topic={} payload=b''".format(
         poweroff_message.topic
@@ -291,7 +297,7 @@ def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_passwor
     with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager"
     ):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"^Missing MQTT username$"):
             systemctl_mqtt._run(
                 mqtt_host=mqtt_host,
                 mqtt_port=mqtt_port,
@@ -300,6 +306,7 @@ def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_passwor
                 mqtt_topic_prefix="prefix",
                 homeassistant_discovery_prefix="discovery-prefix",
                 homeassistant_node_id="node-id",
+                poweroff_delay=datetime.timedelta(),
             )
 
 
@@ -314,9 +321,9 @@ def test_mqtt_message_callback_poweroff(caplog, mqtt_topic: str, payload: bytes)
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
             "poweroff"
         ].mqtt_message_callback(
-            None, None, message  # type: ignore
+            None, "state_dummy", message  # type: ignore
         )
-    trigger_mock.assert_called_once_with()
+    trigger_mock.assert_called_once_with(state="state_dummy")
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
