@@ -160,7 +160,7 @@ def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
-        mqtt_action.action()
+        mqtt_action.trigger()
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2

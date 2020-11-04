@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import abc
 import argparse
 import datetime
 import functools
@@ -192,13 +193,10 @@ class _State:
         )
 
 
-class _MQTTAction:
-
-    # pylint: disable=too-few-public-methods
-
-    def __init__(self, name: str, action: typing.Callable) -> None:
-        self.name = name
-        self.action = action
+class _MQTTAction(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def trigger(self) -> None:
+        pass
 
     def mqtt_message_callback(
         self,
@@ -213,21 +211,26 @@ class _MQTTAction:
         if message.retain:
             _LOGGER.info("ignoring retained message")
             return
-        _LOGGER.debug("executing action %s (%r)", self.name, self.action)
-        self.action()
-        _LOGGER.debug("completed action %s (%r)", self.name, self.action)
+        _LOGGER.debug("executing action %s", self)
+        self.trigger()
+        _LOGGER.debug("completed action %s", self)
+
+
+class _MQTTActionSchedulePoweroff(_MQTTAction):
+    def __init__(self, delay: datetime.timedelta) -> None:
+        super().__init__()
+        self._delay = delay
+
+    def trigger(self) -> None:
+        # pylint: disable=protected-access
+        systemctl_mqtt._dbus.schedule_shutdown(action="poweroff", delay=self._delay)
+
+    def __str__(self) -> str:
+        return type(self).__name__
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
-    "poweroff": _MQTTAction(
-        name="poweroff",
-        action=functools.partial(
-            # pylint: disable=protected-access
-            systemctl_mqtt._dbus.schedule_shutdown,
-            action="poweroff",
-            delay=datetime.timedelta(seconds=4),
-        ),
-    ),
+    "poweroff": _MQTTActionSchedulePoweroff(delay=datetime.timedelta(seconds=4))
 }
 
 
@@ -255,7 +258,7 @@ def _mqtt_on_connect(
             sub=topic, callback=action.mqtt_message_callback
         )
         _LOGGER.debug(
-            "registered MQTT callback for topic %s triggering %r", topic, action.action,
+            "registered MQTT callback for topic %s triggering %s", topic, action
         )
 
 

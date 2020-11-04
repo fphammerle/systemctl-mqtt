@@ -136,7 +136,7 @@ def test__run(
     assert caplog.records[5].message == "registered MQTT callback for topic {}".format(
         mqtt_topic_prefix + "/poweroff"
     ) + " triggering {}".format(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"].action
+        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"]
     )
     # dbus loop started?
     glib_loop_mock.assert_called_once_with()
@@ -272,16 +272,16 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
     caplog.set_level(logging.DEBUG)
     poweroff_message = MQTTMessage(topic=mqtt_topic_prefix.encode() + b"/poweroff")
     with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
-    ) as poweroff_action_mock:
+        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
+    ) as poweroff_trigger_mock:
         mqtt_client._handle_on_message(poweroff_message)
-    poweroff_action_mock.assert_called_once_with()
+    poweroff_trigger_mock.assert_called_once_with()
     assert all(r.levelno == logging.DEBUG for r in caplog.records)
     assert caplog.records[0].message == "received topic={} payload=b''".format(
         poweroff_message.topic
     )
-    assert caplog.records[1].message.startswith("executing action poweroff")
-    assert caplog.records[2].message.startswith("completed action poweroff")
+    assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
+    assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
@@ -309,27 +309,23 @@ def test_mqtt_message_callback_poweroff(caplog, mqtt_topic: str, payload: bytes)
     message = MQTTMessage(topic=mqtt_topic.encode())
     message.payload = payload
     with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
-    ) as action_mock, caplog.at_level(logging.DEBUG):
+        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
+    ) as trigger_mock, caplog.at_level(logging.DEBUG):
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
             "poweroff"
         ].mqtt_message_callback(
             None, None, message  # type: ignore
         )
-    action_mock.assert_called_once_with()
+    trigger_mock.assert_called_once_with()
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
         "received topic={} payload={!r}".format(mqtt_topic, payload)
     )
     assert caplog.records[1].levelno == logging.DEBUG
-    assert caplog.records[1].message.startswith(
-        "executing action {} ({!r})".format("poweroff", action_mock)
-    )
+    assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
     assert caplog.records[2].levelno == logging.DEBUG
-    assert caplog.records[2].message.startswith(
-        "completed action {} ({!r})".format("poweroff", action_mock)
-    )
+    assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
 
 
 @pytest.mark.parametrize("mqtt_topic", ["system/command/poweroff"])
@@ -341,14 +337,14 @@ def test_mqtt_message_callback_poweroff_retained(
     message.payload = payload
     message.retain = True
     with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "action",
-    ) as action_mock, caplog.at_level(logging.DEBUG):
+        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
+    ) as trigger_mock, caplog.at_level(logging.DEBUG):
         systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
             "poweroff"
         ].mqtt_message_callback(
             None, None, message  # type: ignore
         )
-    action_mock.assert_not_called()
+    trigger_mock.assert_not_called()
     assert len(caplog.records) == 2
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
