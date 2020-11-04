@@ -225,6 +225,7 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
             # pylint: disable=protected-access
             systemctl_mqtt._dbus.schedule_shutdown,
             action="poweroff",
+            delay=datetime.timedelta(seconds=4),
         ),
     ),
 }
