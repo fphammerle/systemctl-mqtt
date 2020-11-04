@@ -114,3 +114,9 @@ systemctl-mqtt --mqtt-username me --mqtt-password secret …
 # or
 systemctl-mqtt --mqtt-username me --mqtt-password-file /var/lib/secrets/mqtt/password …
 ```
+
+## Adapt Poweroff Delay
+
+```sh
+systemctl-mqtt --poweroff-delay-seconds 60 …
+```
