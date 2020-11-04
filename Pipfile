@@ -18,10 +18,11 @@ pytest = "*"
 pytest-cov = "*"
 
 # python3.5 compatibility
-# https://github.com/jaraco/zipp/commit/05a3c52b4d41690e0471a2e283cffb500dc0329a
-zipp = "<2"
+isort = "<5"
 # workaround https://github.com/pytest-dev/pytest/issues/3953
 pathlib2 = {version = "*", markers="python_version < '3.6'"}
+# https://github.com/jaraco/zipp/commit/05a3c52b4d41690e0471a2e283cffb500dc0329a
+zipp = "<2"
 
 # python3.8 compatibility
 # workaround https://github.com/WanzenBug/pylint-import-requirements/issues/17
