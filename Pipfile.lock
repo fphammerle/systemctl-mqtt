@@ -36,9 +36,9 @@
         },
         "pygobject": {
             "hashes": [
-                "sha256:012a589aec687bfa809a1ff9f5cd775dc7f6fcec1a6bc7fe88e1002a68f8ba34"
+                "sha256:051b950f509f2e9f125add96c1493bde987c527f7a0c15a1f7b69d6d1c3cd8e6"
             ],
-            "version": "==3.36.1"
+            "version": "==3.38.0"
         },
         "systemctl-mqtt": {
             "editable": true,
