@@ -1,19 +1,29 @@
 version: '2.2'
 
-volumes:
-  config:
+#volumes:
+#  config:
 
 services:
-  mqtt_client:
+  broker:
+    image: docker.io/eclipse-mosquitto:latest
+    user: mosquitto
+    read_only: yes
+    cap_drop: [all]
+    security_opt: [no-new-privileges]
+    cpus: 0.4
+    mem_limit: 32M
+  client:
     build: .
     image: fphammerle/systemctl-mqtt
     volumes:
-    - config:/etc/systemctl-mqtt:ro
+    #- config:/etc/systemctl-mqtt:ro
     - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:rw
     command: systemctl-mqtt
-      --mqtt-host mqtt-broker.local
-      --mqtt-username raspberrypi
-      --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
+      --poweroff-delay-seconds 60
+      --mqtt-host broker
+      --mqtt-disable-tls
+    #  --mqtt-username raspberrypi
+    #  --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
     hostname: raspberrypi
     userns_mode: host
     # prefering explicit user specification over "USER 0" in Dockerfile
