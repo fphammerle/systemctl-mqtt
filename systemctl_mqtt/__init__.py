@@ -261,7 +261,6 @@ def _mqtt_on_connect(
 
 
 def _run(
-    *,
     mqtt_host: str,
     mqtt_port: int,
     mqtt_username: typing.Optional[str],
