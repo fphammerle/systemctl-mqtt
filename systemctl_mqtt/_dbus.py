@@ -22,8 +22,6 @@ import dbus
 
 _LOGGER = logging.getLogger(__name__)
 
-_SHUTDOWN_DELAY = datetime.timedelta(seconds=4)
-
 
 def get_login_manager() -> dbus.proxies.Interface:
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html
@@ -61,10 +59,10 @@ def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
         _LOGGER.debug("no shutdown inhibitor locks found")
 
 
-def schedule_shutdown(action: str) -> None:
+def schedule_shutdown(action: str, delay: datetime.timedelta) -> None:
     # https://github.com/systemd/systemd/blob/v237/src/systemctl/systemctl.c#L8553
     assert action in ["poweroff", "reboot"], action
-    shutdown_datetime = datetime.datetime.now() + _SHUTDOWN_DELAY
+    shutdown_datetime = datetime.datetime.now() + delay
     # datetime.datetime.isoformat(timespec=) not available in python3.5
     # https://github.com/python/cpython/blob/v3.5.9/Lib/datetime.py#L1552
     _LOGGER.info(

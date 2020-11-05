@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import datetime
 import json
 import logging
 import unittest.mock
@@ -34,6 +35,7 @@ def test_shutdown_lock():
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
             homeassistant_node_id=None,
+            poweroff_delay=datetime.timedelta(),
         )
         state._login_manager.Inhibit.return_value = lock_fd
         state.acquire_shutdown_lock()
@@ -55,6 +57,7 @@ def test_prepare_for_shutdown_handler(caplog, active):
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
             homeassistant_node_id=None,
+            poweroff_delay=datetime.timedelta(),
         )
     mqtt_client_mock = unittest.mock.MagicMock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client_mock)
@@ -98,6 +101,7 @@ def test_publish_preparing_for_shutdown(active):
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
             homeassistant_node_id=None,
+            poweroff_delay=datetime.timedelta(),
         )
     assert state._login_manager == login_manager_mock
     mqtt_client_mock = unittest.mock.MagicMock()
@@ -124,6 +128,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
             homeassistant_node_id=None,
+            poweroff_delay=datetime.timedelta(),
         )
     mqtt_client_mock = unittest.mock.MagicMock()
     state.publish_preparing_for_shutdown(mqtt_client=None)
@@ -147,6 +152,7 @@ def test_publish_preparing_for_shutdown_homeassistant_config(
         mqtt_topic_prefix=topic_prefix,
         homeassistant_discovery_prefix=discovery_prefix,
         homeassistant_node_id=node_id,
+        poweroff_delay=datetime.timedelta(),
     )
     mqtt_client = unittest.mock.MagicMock()
     with unittest.mock.patch(

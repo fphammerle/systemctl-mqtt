@@ -98,24 +98,23 @@ def test__log_shutdown_inhibitors_fail(caplog):
 
 
 @pytest.mark.parametrize("action", ["poweroff", "reboot"])
-def test__schedule_shutdown(action):
+@pytest.mark.parametrize("delay", [datetime.timedelta(0), datetime.timedelta(hours=1)])
+def test__schedule_shutdown(action, delay):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
-        systemctl_mqtt._dbus.schedule_shutdown(action=action)
+        systemctl_mqtt._dbus.schedule_shutdown(action=action, delay=delay)
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == action
     assert isinstance(schedule_args[1], dbus.UInt64)
     shutdown_datetime = datetime.datetime.fromtimestamp(
-        schedule_args[1] / 10 ** 6, tz=_UTC,
+        schedule_args[1] / 10 ** 6, tz=_UTC
     )
-    delay = shutdown_datetime - datetime.datetime.now(tz=_UTC)
-    assert delay.total_seconds() == pytest.approx(
-        systemctl_mqtt._dbus._SHUTDOWN_DELAY.total_seconds(), abs=0.1,
-    )
+    actual_delay = shutdown_datetime - datetime.datetime.now(tz=_UTC)
+    assert actual_delay.total_seconds() == pytest.approx(delay.total_seconds(), abs=0.1)
     assert not schedule_kwargs
 
 
@@ -138,7 +137,9 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ), caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._dbus.schedule_shutdown(action=action)
+        systemctl_mqtt._dbus.schedule_shutdown(
+            action=action, delay=datetime.timedelta(seconds=21)
+        )
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.INFO
@@ -159,7 +160,14 @@ def test_mqtt_topic_suffix_action_mapping(topic_suffix, expected_action_arg):
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
     ):
-        mqtt_action.action()
+        mqtt_action.trigger(
+            state=systemctl_mqtt._State(
+                mqtt_topic_prefix="systemctl/hostname",
+                homeassistant_discovery_prefix="homeassistant",
+                homeassistant_node_id="node",
+                poweroff_delay=datetime.timedelta(),
+            )
+        )
     assert login_manager_mock.ScheduleShutdown.call_count == 1
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2

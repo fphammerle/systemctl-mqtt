@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import datetime
 import typing
 import unittest.mock
 
@@ -159,11 +160,12 @@ def test__main(
         mqtt_topic_prefix=expected_topic_prefix or "systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
         homeassistant_node_id="hostname",
+        poweroff_delay=datetime.timedelta(seconds=4),
     )
 
 
 @pytest.mark.parametrize(
-    ("password_file_content", "expected_password",),
+    ("password_file_content", "expected_password"),
     [
         ("secret", "secret"),
         ("secret space", "secret space"),
@@ -205,6 +207,7 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         mqtt_topic_prefix="systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
         homeassistant_node_id="hostname",
+        poweroff_delay=datetime.timedelta(seconds=4),
     )
 
 
@@ -274,3 +277,20 @@ def test__main_homeassistant_node_id_invalid(args):
     ):
         with pytest.raises(ValueError):
             systemctl_mqtt._main()
+
+
+@pytest.mark.parametrize(
+    ("args", "poweroff_delay"),
+    [
+        ([], datetime.timedelta(seconds=4)),
+        (["--poweroff-delay-seconds", "42.21"], datetime.timedelta(seconds=42.21)),
+        (["--poweroff-delay-seconds", "3600"], datetime.timedelta(hours=1)),
+    ],
+)
+def test__main_poweroff_delay(args, poweroff_delay):
+    with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
+        "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
+    ):
+        systemctl_mqtt._main()
+    assert run_mock.call_count == 1
+    assert run_mock.call_args[1]["poweroff_delay"] == poweroff_delay
