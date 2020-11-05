@@ -6,6 +6,11 @@ name = "pypi"
 [packages]
 systemctl-mqtt = {editable = true,path = "."}
 
+# python3.5 compatibility
+# systemctl-mqtt > PyGObject > pycairo
+# https://github.com/pygobject/pycairo/commit/6fb84db03704e98acedda3514680a62e05d1b80f#diff-60f61ab7a8d1910d86d9fda2261620314edcae5894d5aaa236b821c7256badd7R613
+pycairo = "<1.20"
+
 [dev-packages]
 # black requires python>=3.6
 # https://github.com/psf/black/commit/e74117f172e29e8a980e2c9de929ad50d3769150#diff-2eeaed663bd0d25b7e608891384b7298R51
