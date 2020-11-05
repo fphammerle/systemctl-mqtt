@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - command line option `--poweroff-delay-seconds` (default: 4 seconds)
 
 ### Changed
-- docker build stage: revert user after applying `chown` workaround for inter-stage copy
+- docker image:
+  - upgrade `paho-mqtt` to no longer suppress exceptions occuring in mqtt callbacks
+    ( https://github.com/eclipse/paho.mqtt.python/blob/v1.5.1/ChangeLog.txt#L4 )
+  - build stage: revert user after applying `chown` workaround for inter-stage copy
 
 ## [0.4.0] - 2020-09-10
 ### Added
