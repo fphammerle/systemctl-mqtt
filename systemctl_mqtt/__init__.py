@@ -48,7 +48,6 @@ _LOGGER = logging.getLogger(__name__)
 class _State:
     def __init__(
         self,
-        *,
         mqtt_topic_prefix: str,
         homeassistant_discovery_prefix: str,
         homeassistant_node_id: str,
