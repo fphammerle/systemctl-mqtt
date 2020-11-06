@@ -66,7 +66,7 @@ def schedule_shutdown(action: str, delay: datetime.timedelta) -> None:
     # datetime.datetime.isoformat(timespec=) not available in python3.5
     # https://github.com/python/cpython/blob/v3.5.9/Lib/datetime.py#L1552
     _LOGGER.info(
-        "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S")
     )
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html?highlight=signature#basic-types
     shutdown_epoch_usec = dbus.UInt64(shutdown_datetime.timestamp() * 10 ** 6)
@@ -95,3 +95,11 @@ def schedule_shutdown(action: str, delay: datetime.timedelta) -> None:
         else:
             _LOGGER.error("failed to schedule %s: %s", action, exc_msg)
     _log_shutdown_inhibitors(login_manager)
+
+
+def lock_all_sessions() -> None:
+    """
+    $ loginctl lock-sessions
+    """
+    _LOGGER.info("instruct all sessions to activate screen locks")
+    get_login_manager().LockSessions()

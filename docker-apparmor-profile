@@ -50,7 +50,7 @@ profile systemctl-mqtt flags=(attach_disconnected) {
        bus=system
        path=/org/freedesktop/login1
        interface=org.freedesktop.login1.Manager
-       member={Inhibit,ListInhibitors,ScheduleShutdown}
+       member={Inhibit,ListInhibitors,ScheduleShutdown,LockSessions}
        peer=(label=unconfined),
   dbus (receive)
        bus=system

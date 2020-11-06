@@ -103,14 +103,18 @@ def test__run(
         state._login_manager.connect_to_signal.call_args[1]["signal_name"]
         == "PrepareForShutdown"
     )
-    mqtt_subscribe_mock.assert_called_once_with(mqtt_topic_prefix + "/poweroff")
+    assert mqtt_subscribe_mock.call_args_list == [
+        unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
+        unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
+    ]
     assert mqtt_client.on_message is None
-    assert (  # pylint: disable=comparison-with-callable
-        mqtt_client._on_message_filtered[mqtt_topic_prefix + "/poweroff"]
-        == systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
-            "poweroff"
-        ].mqtt_message_callback
-    )
+    for suffix in ("poweroff", "lock-all-sessions"):
+        assert (  # pylint: disable=comparison-with-callable
+            mqtt_client._on_message_filtered[mqtt_topic_prefix + "/" + suffix]
+            == systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
+                suffix
+            ].mqtt_message_callback
+        )
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == "connected to MQTT broker {}:{}".format(
         mqtt_host, mqtt_port

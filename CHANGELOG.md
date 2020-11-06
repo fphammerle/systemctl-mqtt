@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- MQTT message on topic `systemctl/hostname/lock-all-sessions`
+  instructs all sessions to activate screen locks
+  (functionally equivalent to command `loginctl lock-sessions`)
 - command line option `--poweroff-delay-seconds` (default: 4 seconds)
 
 ### Changed

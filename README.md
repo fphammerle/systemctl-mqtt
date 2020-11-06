@@ -27,6 +27,12 @@ Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/powerof
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/poweroff -n
 ```
 
+Lock screen by sending a MQTT message to topic `systemctl/hostname/lock-all-sessions`.
+
+```
+$ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
+```
+
 ### Shutdown Report
 
 `systemctl-mqtt` subscribes to [logind](https://freedesktop.org/wiki/Software/systemd/logind/)'s `PrepareForShutdown` signal.

@@ -42,6 +42,7 @@ setuptools.setup(
         "automation",
         "home-assistant",
         "home-automation",
+        "lock",
         "mqtt",
         "shutdown",
         "systemd",

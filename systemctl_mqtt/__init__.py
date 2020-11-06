@@ -76,7 +76,7 @@ class _State:
             assert self._shutdown_lock is None
             # https://www.freedesktop.org/wiki/Software/systemd/inhibit/
             self._shutdown_lock = self._login_manager.Inhibit(
-                "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
+                "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay"
             )
             _LOGGER.debug("acquired shutdown inhibitor lock")
 
@@ -93,7 +93,7 @@ class _State:
         return self.mqtt_topic_prefix + "/preparing-for-shutdown"
 
     def _publish_preparing_for_shutdown(
-        self, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool,
+        self, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool
     ) -> None:
         # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1199
         topic = self._preparing_for_shutdown_topic
@@ -101,7 +101,7 @@ class _State:
         payload = systemctl_mqtt._mqtt.encode_bool(active)
         _LOGGER.info("publishing %r on %s", payload, topic)
         msg_info = mqtt_client.publish(
-            topic=topic, payload=payload, retain=True,
+            topic=topic, payload=payload, retain=True
         )  # type: paho.mqtt.client.MQTTMessageInfo
         if not block:
             return
@@ -117,7 +117,7 @@ class _State:
         assert isinstance(active, dbus.Boolean)
         active = bool(active)
         self._publish_preparing_for_shutdown(
-            mqtt_client=mqtt_client, active=active, block=True,
+            mqtt_client=mqtt_client, active=active, block=True
         )
         if active:
             self.release_shutdown_lock()
@@ -135,7 +135,7 @@ class _State:
         )
 
     def publish_preparing_for_shutdown(
-        self, mqtt_client: paho.mqtt.client.Client,
+        self, mqtt_client: paho.mqtt.client.Client
     ) -> None:
         try:
             active = self._login_manager.Get(
@@ -191,7 +191,7 @@ class _State:
         }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         mqtt_client.publish(
-            topic=discovery_topic, payload=json.dumps(config), retain=True,
+            topic=discovery_topic, payload=json.dumps(config), retain=True
         )
 
 
@@ -229,7 +229,19 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
         return type(self).__name__
 
 
-_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {"poweroff": _MQTTActionSchedulePoweroff()}
+class _MQTTActionLockAllSessions(_MQTTAction):
+    def trigger(self, state: _State) -> None:
+        # pylint: disable=protected-access
+        systemctl_mqtt._dbus.lock_all_sessions()
+
+    def __str__(self) -> str:
+        return type(self).__name__
+
+
+_MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
+    "poweroff": _MQTTActionSchedulePoweroff(),
+    "lock-all-sessions": _MQTTActionLockAllSessions(),
+}
 
 
 def _mqtt_on_connect(
@@ -349,7 +361,7 @@ def _main() -> None:
     )
     # https://www.home-assistant.io/docs/mqtt/discovery/#discovery_prefix
     argparser.add_argument(
-        "--homeassistant-discovery-prefix", type=str, default="homeassistant", help=" ",
+        "--homeassistant-discovery-prefix", type=str, default="homeassistant", help=" "
     )
     argparser.add_argument(
         "--homeassistant-node-id",
@@ -359,7 +371,7 @@ def _main() -> None:
         help=" ",
     )
     argparser.add_argument(
-        "--poweroff-delay-seconds", type=float, default=4.0, help=" ",
+        "--poweroff-delay-seconds", type=float, default=4.0, help=" "
     )
     args = argparser.parse_args()
     if args.mqtt_port:
