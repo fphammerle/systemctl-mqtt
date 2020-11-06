@@ -49,9 +49,9 @@ def test__run(
     with unittest.mock.patch(
         "socket.create_connection"
     ) as create_socket_mock, unittest.mock.patch(
-        "ssl.SSLContext.wrap_socket", autospec=True,
+        "ssl.SSLContext.wrap_socket", autospec=True
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True,
+        "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ) as glib_loop_mock, unittest.mock.patch(
@@ -103,9 +103,9 @@ def test__run(
         state._login_manager.connect_to_signal.call_args[1]["signal_name"]
         == "PrepareForShutdown"
     )
-    assert mqtt_subscribe_mock.call_args_list == [
-        unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
+    assert sorted(mqtt_subscribe_mock.call_args_list) == [
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
+        unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
     ]
     assert mqtt_client.on_message is None
     for suffix in ("poweroff", "lock-all-sessions"):
@@ -212,7 +212,7 @@ def test__run_authentication(
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
         "ssl.SSLContext.wrap_socket"
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True,
+        "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ), unittest.mock.patch(
@@ -242,9 +242,9 @@ def _initialize_mqtt_client(
     mqtt_host, mqtt_port, mqtt_topic_prefix
 ) -> paho.mqtt.client.Client:
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
-        "ssl.SSLContext.wrap_socket",
+        "ssl.SSLContext.wrap_socket"
     ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True,
+        "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "gi.repository.GLib.MainLoop.run"
     ), unittest.mock.patch(
