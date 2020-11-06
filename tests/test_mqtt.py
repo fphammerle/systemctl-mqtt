@@ -134,16 +134,17 @@ def test__run(
         + homeassistant_node_id
         + "/preparing-for-shutdown/config"
     )
-    assert caplog.records[4].levelno == logging.INFO
-    assert caplog.records[4].message == "subscribing to {}".format(
-        mqtt_topic_prefix + "/poweroff"
-    )
-    assert caplog.records[5].levelno == logging.DEBUG
-    assert caplog.records[5].message == "registered MQTT callback for topic {}".format(
-        mqtt_topic_prefix + "/poweroff"
-    ) + " triggering {}".format(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"]
-    )
+    assert all(r.levelno == logging.INFO for r in caplog.records[4::2])
+    assert {r.message for r in caplog.records[4::2]} == {
+        "subscribing to {}/{}".format(mqtt_topic_prefix, s)
+        for s in ("poweroff", "lock-all-sessions")
+    }
+    assert all(r.levelno == logging.DEBUG for r in caplog.records[5::2])
+    assert {r.message for r in caplog.records[5::2]} == {
+        "registered MQTT callback for topic {}".format(mqtt_topic_prefix + "/" + s)
+        + " triggering {}".format(systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s])
+        for s in ("poweroff", "lock-all-sessions")
+    }
     # dbus loop started?
     glib_loop_mock.assert_called_once_with()
     # waited for mqtt loop to stop?
