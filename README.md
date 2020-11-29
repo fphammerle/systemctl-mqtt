@@ -21,16 +21,14 @@ On debian-based systems, dependencies can optionally be installed via:
 $ sudo apt-get install --no-install-recommends python3-dbus python3-gi python3-paho-mqtt
 ```
 
+## Usage
+
+### Schedule Poweroff
+
 Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/poweroff`.
 
 ```sh
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/poweroff -n
-```
-
-Lock screen by sending a MQTT message to topic `systemctl/hostname/lock-all-sessions`.
-
-```
-$ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
 ```
 
 ### Shutdown Report
@@ -38,6 +36,14 @@ $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
 `systemctl-mqtt` subscribes to [logind](https://freedesktop.org/wiki/Software/systemd/logind/)'s `PrepareForShutdown` signal.
 
 `systemctl halt|poweroff|reboot` triggers a message with payload `true` on topic `systemctl/hostname/preparing-for-shutdown`.
+
+### Lock Screen
+
+Lock screen by sending a MQTT message to topic `systemctl/hostname/lock-all-sessions`.
+
+```
+$ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
+```
 
 ## Home Assistant 🏡
 
