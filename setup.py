@@ -61,7 +61,11 @@ setuptools.setup(
         "Programming Language :: Python :: 3.8",
         "Topic :: Home Automation",
     ],
-    entry_points={"console_scripts": ["systemctl-mqtt = systemctl_mqtt:_main",]},
+    entry_points={
+        "console_scripts": [
+            "systemctl-mqtt = systemctl_mqtt:_main",
+        ]
+    },
     # https://dbus.freedesktop.org/doc/dbus-python/news.html
     install_requires=["PyGObject<4", "dbus-python<2", "paho-mqtt<2"],
     setup_requires=["setuptools_scm"],

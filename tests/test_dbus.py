@@ -102,7 +102,7 @@ def test__log_shutdown_inhibitors_fail(caplog):
 def test__schedule_shutdown(action, delay):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
     ):
         systemctl_mqtt._dbus.schedule_shutdown(action=action, delay=delay)
     assert login_manager_mock.ScheduleShutdown.call_count == 1
@@ -135,7 +135,7 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
         exception_message
     )
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock,
+        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
     ), caplog.at_level(logging.DEBUG):
         systemctl_mqtt._dbus.schedule_shutdown(
             action=action, delay=datetime.timedelta(seconds=21)

@@ -40,7 +40,7 @@ def test_shutdown_lock():
         state._login_manager.Inhibit.return_value = lock_fd
         state.acquire_shutdown_lock()
     state._login_manager.Inhibit.assert_called_once_with(
-        "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay",
+        "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay"
     )
     assert state._shutdown_lock == lock_fd
     # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
@@ -146,7 +146,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
 @pytest.mark.parametrize("node_id", ["node", "node-id"])
 @pytest.mark.parametrize("hostname", ["hostname", "host-name"])
 def test_publish_preparing_for_shutdown_homeassistant_config(
-    topic_prefix, discovery_prefix, node_id, hostname,
+    topic_prefix, discovery_prefix, node_id, hostname
 ):
     state = systemctl_mqtt._State(
         mqtt_topic_prefix=topic_prefix,

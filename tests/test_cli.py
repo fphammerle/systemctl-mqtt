@@ -255,13 +255,16 @@ def test__main_homeassistant_discovery_prefix(args, discovery_prefix):
 
 @pytest.mark.parametrize(
     ("args", "node_id"),
-    [([], "fallback"), (["--homeassistant-node-id", "raspberrypi"], "raspberrypi"),],
+    [
+        ([], "fallback"),
+        (["--homeassistant-node-id", "raspberrypi"], "raspberrypi"),
+    ],
 )
 def test__main_homeassistant_node_id(args, node_id):
     with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ), unittest.mock.patch(
-        "systemctl_mqtt._utils.get_hostname", return_value="fallback",
+        "systemctl_mqtt._utils.get_hostname", return_value="fallback"
     ):
         systemctl_mqtt._main()
     assert run_mock.call_count == 1
@@ -269,7 +272,8 @@ def test__main_homeassistant_node_id(args, node_id):
 
 
 @pytest.mark.parametrize(
-    "args", [["--homeassistant-node-id", "no pe"], ["--homeassistant-node-id", ""]],
+    "args",
+    [["--homeassistant-node-id", "no pe"], ["--homeassistant-node-id", ""]],
 )
 def test__main_homeassistant_node_id_invalid(args):
     with unittest.mock.patch(
