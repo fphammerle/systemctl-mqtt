@@ -1,6 +1,6 @@
 # not using python:3.*-alpine cause glib-dev package depends on python3
 # https://pkgs.alpinelinux.org/package/v3.11/main/aarch64/glib-dev
-ARG BASE_IMAGE=alpine:3.11
+ARG BASE_IMAGE=alpine:3.13.1
 ARG SOURCE_DIR_PATH=/systemctl-mqtt
 
 
@@ -17,6 +17,7 @@ RUN apk add --no-cache \
         make `# dbus-python` \
         musl-dev `# dbus-python` \
         py3-certifi `# pipenv` \
+        py3-pip `# pipenv install` \
         py3-virtualenv `# pipenv` \
         python3-dev `# dbus-python` \
     && adduser -S build
