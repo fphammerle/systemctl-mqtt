@@ -1,3 +1,5 @@
+# sync with https://github.com/fphammerle/wireless-sensor-mqtt/blob/master/Dockerfile
+
 # not using python:3.*-alpine cause glib-dev package depends on python3
 # https://pkgs.alpinelinux.org/package/v3.11/main/aarch64/glib-dev
 ARG BASE_IMAGE=alpine:3.13.1
@@ -14,6 +16,7 @@ RUN apk add --no-cache \
         git `# setuptools_scm` \
         glib-dev `# dbus-python` \
         gobject-introspection-dev `# PyGObject` \
+        jq `# edit Pipfile.lock` \
         make `# dbus-python` \
         musl-dev `# dbus-python` \
         py3-certifi `# pipenv` \
@@ -26,11 +29,16 @@ USER build
 RUN pip3 install --user --no-cache-dir pipenv==2020.6.2
 
 ARG SOURCE_DIR_PATH
-COPY --chown=build:1234 . $SOURCE_DIR_PATH
+COPY --chown=build:nobody Pipfile Pipfile.lock $SOURCE_DIR_PATH/
 WORKDIR $SOURCE_DIR_PATH
 ENV PIPENV_CACHE_DIR=/tmp/pipenv-cache \
     PIPENV_VENV_IN_PROJECT=yes-please \
     PATH=/home/build/.local/bin:$PATH
+# `sponge` is not pre-installed
+RUN jq 'del(.default."systemctl-mqtt")' Pipfile.lock > Pipfile.lock~ \
+    && mv Pipfile.lock~ Pipfile.lock \
+    && pipenv install --deploy --verbose
+COPY --chown=build:nobody . $SOURCE_DIR_PATH
 RUN pipenv install --deploy --verbose \
     && pipenv graph \
     && pipenv run pip freeze \
