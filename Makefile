@@ -12,10 +12,15 @@ IMAGE_TAG_ARCH_x86_64 = amd64
 IMAGE_TAG_ARCH = ${IMAGE_TAG_ARCH_${ARCH}}
 IMAGE_TAG = ${BUILD_VERSION}-${IMAGE_TAG_ARCH}
 
-.PHONY: docker-build docker-push
+.PHONY: docker-build podman-build docker-push
 
 docker-build:
 	sudo docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+
+podman-build:
+	# --format=oci (default) not fully supported by hub.docker.com
+	# https://github.com/docker/hub-feedback/issues/1871#issuecomment-748924149
+	podman build --format=docker -t "${IMAGE_NAME}:${IMAGE_TAG}" .
 
 docker-push: docker-build
 	sudo docker push "${IMAGE_NAME}:${IMAGE_TAG}"
