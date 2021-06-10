@@ -10,6 +10,8 @@ systemctl-mqtt = {editable = true,path = "."}
 # systemctl-mqtt > PyGObject > pycairo
 # https://github.com/pygobject/pycairo/commit/6fb84db03704e98acedda3514680a62e05d1b80f#diff-60f61ab7a8d1910d86d9fda2261620314edcae5894d5aaa236b821c7256badd7R613
 pycairo = "<1.20"
+# https://gitlab.gnome.org/GNOME/pygobject/-/commit/6ffc87e51694abd03aed2d42683d65caa74e313d#25c091fe9b353e5846c7f662d58067fd7cebe0f8_21_21
+pygobject = "<3.40"
 
 [dev-packages]
 # black requires python>=3.6
