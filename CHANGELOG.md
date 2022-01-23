@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - dockerfile: add `--force` flag to `rm` invocation to avoid interactive questions while running `podman build`
 
 ### Removed
-- compatibility with `python3.5`
+- compatibility with `python3.5` & `python3.6`
 
 ## [0.5.0] - 2020-11-06
 ### Added

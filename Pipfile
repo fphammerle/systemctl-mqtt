@@ -15,10 +15,11 @@ pylint-import-requirements = ">=2.0.3"
 pytest = "*"
 pytest-cov = "*"
 
-# python3.6 compatibility
-importlib-metadata = "<4.9"
-platformdirs = "<2.4.1"
-zipp = "<3.7"
+# python3.10 compatibility
+# >   File "[...]/lib/python3.10/site-packages/mypy/main.py", line 11, in <module>
+# >     from typing_extensions import Final, NoReturn
+# > ModuleNotFoundError: No module named 'typing_extensions'
+typing-extensions = "*"
 # mypy on python<3.8
 typed-ast = {markers = "python_version < '3.8'"}
 
