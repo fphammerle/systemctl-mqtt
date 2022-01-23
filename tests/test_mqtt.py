@@ -71,21 +71,21 @@ def test__run(
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
-        "connecting to MQTT broker {}:{} (TLS enabled)".format(mqtt_host, mqtt_port)
+        f"connecting to MQTT broker {mqtt_host}:{mqtt_port} (TLS enabled)"
     )
     # correct remote?
-    assert create_socket_mock.call_count == 1
+    create_socket_mock.assert_called_once()
     create_socket_args, _ = create_socket_mock.call_args
     assert create_socket_args[0] == (mqtt_host, mqtt_port)
     # ssl enabled?
-    assert ssl_wrap_socket_mock.call_count == 1
+    ssl_wrap_socket_mock.assert_called_once()
     ssl_context = ssl_wrap_socket_mock.call_args[0][0]  # self
     assert ssl_context.check_hostname is True
     assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
     # loop started?
     while threading.active_count() > 1:
         time.sleep(0.01)
-    assert mqtt_loop_forever_mock.call_count == 1
+    mqtt_loop_forever_mock.assert_called_once()
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
     assert mqtt_client._tls_insecure is False
     # credentials
@@ -116,14 +116,15 @@ def test__run(
             ].mqtt_message_callback
         )
     assert caplog.records[0].levelno == logging.DEBUG
-    assert caplog.records[0].message == "connected to MQTT broker {}:{}".format(
-        mqtt_host, mqtt_port
+    assert (
+        caplog.records[0].message == f"connected to MQTT broker {mqtt_host}:{mqtt_port}"
     )
     assert caplog.records[1].levelno == logging.DEBUG
     assert caplog.records[1].message == "acquired shutdown inhibitor lock"
     assert caplog.records[2].levelno == logging.INFO
-    assert caplog.records[2].message == "publishing 'false' on {}".format(
-        mqtt_topic_prefix + "/preparing-for-shutdown"
+    assert (
+        caplog.records[2].message
+        == f"publishing 'false' on {mqtt_topic_prefix}/preparing-for-shutdown"
     )
     assert caplog.records[3].levelno == logging.DEBUG
     assert (
@@ -136,13 +137,13 @@ def test__run(
     )
     assert all(r.levelno == logging.INFO for r in caplog.records[4::2])
     assert {r.message for r in caplog.records[4::2]} == {
-        "subscribing to {}/{}".format(mqtt_topic_prefix, s)
+        f"subscribing to {mqtt_topic_prefix}/{s}"
         for s in ("poweroff", "lock-all-sessions")
     }
     assert all(r.levelno == logging.DEBUG for r in caplog.records[5::2])
     assert {r.message for r in caplog.records[5::2]} == {
-        "registered MQTT callback for topic {}".format(mqtt_topic_prefix + "/" + s)
-        + " triggering {}".format(systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s])
+        f"registered MQTT callback for topic {mqtt_topic_prefix}/{s}"
+        f" triggering {systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s]}"
         for s in ("poweroff", "lock-all-sessions")
     }
     # dbus loop started?
@@ -173,9 +174,8 @@ def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
-        "connecting to MQTT broker {}:{} (TLS {})".format(
-            mqtt_host, mqtt_port, "disabled" if mqtt_disable_tls else "enabled"
-        )
+        f"connecting to MQTT broker {mqtt_host}:{mqtt_port}"
+        f" (TLS {'disabled' if mqtt_disable_tls else 'enabled'})"
     )
     if mqtt_disable_tls:
         mqtt_client_class().tls_set.assert_not_called()
@@ -230,7 +230,7 @@ def test__run_authentication(
             homeassistant_node_id="node-id",
             poweroff_delay=datetime.timedelta(),
         )
-    assert mqtt_loop_forever_mock.call_count == 1
+    mqtt_loop_forever_mock.assert_called_once()
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
     assert mqtt_client._username.decode() == mqtt_username
     if mqtt_password:
@@ -265,7 +265,7 @@ def _initialize_mqtt_client(
         )
     while threading.active_count() > 1:
         time.sleep(0.01)
-    assert mqtt_loop_forever_mock.call_count == 1
+    mqtt_loop_forever_mock.assert_called_once()
     (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
     mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
     mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
@@ -288,8 +288,9 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
         mqtt_client._handle_on_message(poweroff_message)
     poweroff_trigger_mock.assert_called_once_with(state=mqtt_client._userdata)
     assert all(r.levelno == logging.DEBUG for r in caplog.records)
-    assert caplog.records[0].message == "received topic={} payload=b''".format(
-        poweroff_message.topic
+    assert (
+        caplog.records[0].message
+        == f"received topic={poweroff_message.topic} payload=b''"
     )
     assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
     assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
@@ -332,7 +333,7 @@ def test_mqtt_message_callback_poweroff(caplog, mqtt_topic: str, payload: bytes)
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
-        "received topic={} payload={!r}".format(mqtt_topic, payload)
+        f"received topic={mqtt_topic} payload={payload!r}"
     )
     assert caplog.records[1].levelno == logging.DEBUG
     assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
@@ -360,7 +361,7 @@ def test_mqtt_message_callback_poweroff_retained(
     assert len(caplog.records) == 2
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == (
-        "received topic={} payload={!r}".format(mqtt_topic, payload)
+        f"received topic={mqtt_topic} payload={payload!r}"
     )
     assert caplog.records[1].levelno == logging.INFO
     assert caplog.records[1].message == "ignoring retained message"

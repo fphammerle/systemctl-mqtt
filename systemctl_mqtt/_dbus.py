@@ -59,7 +59,7 @@ def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
         _LOGGER.debug("no shutdown inhibitor locks found")
 
 
-def schedule_shutdown(action: str, delay: datetime.timedelta) -> None:
+def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
     # https://github.com/systemd/systemd/blob/v237/src/systemctl/systemctl.c#L8553
     assert action in ["poweroff", "reboot"], action
     shutdown_datetime = datetime.datetime.now() + delay

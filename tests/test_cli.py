@@ -249,7 +249,7 @@ def test__main_homeassistant_discovery_prefix(args, discovery_prefix):
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ):
         systemctl_mqtt._main()
-    assert run_mock.call_count == 1
+    run_mock.assert_called_once()
     assert run_mock.call_args[1]["homeassistant_discovery_prefix"] == discovery_prefix
 
 
@@ -267,7 +267,7 @@ def test__main_homeassistant_node_id(args, node_id):
         "systemctl_mqtt._utils.get_hostname", return_value="fallback"
     ):
         systemctl_mqtt._main()
-    assert run_mock.call_count == 1
+    run_mock.assert_called_once()
     assert run_mock.call_args[1]["homeassistant_node_id"] == node_id
 
 
@@ -296,5 +296,5 @@ def test__main_poweroff_delay(args, poweroff_delay):
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ):
         systemctl_mqtt._main()
-    assert run_mock.call_count == 1
+    run_mock.assert_called_once()
     assert run_mock.call_args[1]["poweroff_delay"] == poweroff_delay

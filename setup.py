@@ -49,13 +49,12 @@ setuptools.setup(
     ],
     classifiers=[
         # https://pypi.org/classifiers/
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: End Users/Desktop",
         "Intended Audience :: System Administrators",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: POSIX :: Linux",
         # .github/workflows/python.yml
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -67,6 +66,8 @@ setuptools.setup(
             "systemctl-mqtt = systemctl_mqtt:_main",
         ]
     },
+    # >=3.6 variable type hints, f-strings & * to force keyword-only arguments
+    python_requires=">=3.6",
     # https://dbus.freedesktop.org/doc/dbus-python/news.html
     install_requires=["PyGObject<4", "dbus-python<2", "paho-mqtt<2"],
     setup_requires=["setuptools_scm"],

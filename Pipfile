@@ -6,40 +6,21 @@ name = "pypi"
 [packages]
 systemctl-mqtt = {editable = true,path = "."}
 
-# python3.5 compatibility
-# systemctl-mqtt > PyGObject > pycairo
-# https://github.com/pygobject/pycairo/commit/6fb84db03704e98acedda3514680a62e05d1b80f#diff-60f61ab7a8d1910d86d9fda2261620314edcae5894d5aaa236b821c7256badd7R613
-pycairo = "<1.20"
-# https://gitlab.gnome.org/GNOME/pygobject/-/commit/6ffc87e51694abd03aed2d42683d65caa74e313d#25c091fe9b353e5846c7f662d58067fd7cebe0f8_21_21
-pygobject = "<3.40"
-
 [dev-packages]
-# black requires python>=3.6
-# https://github.com/psf/black/commit/e74117f172e29e8a980e2c9de929ad50d3769150#diff-2eeaed663bd0d25b7e608891384b7298R51
-black = {version = "==20.8b1", markers = "python_version >= '3.6'"}
+black = "==21.12b0"
 mypy = "*"
-#pylint = "*"
+pylint = "*"
 # >=2.0.3 to skip PyGObject's custom loader & fix broken wheel
 pylint-import-requirements = ">=2.0.3"
-#pytest = "*"
+pytest = "*"
 pytest-cov = "*"
 
-# python3.5 compatibility
-# https://github.com/PyCQA/astroid/commit/d81f07becf3243a84e0baaa3493ce74cafed8022#diff-60f61ab7a8d1910d86d9fda2261620314edcae5894d5aaa236b821c7256badd7R52
-astroid = "<2.5"
-# https://github.com/pallets/click/commit/9374365fdd5af45fc3dc4047963fa30aad9ce15c
-click = "<8"
-# https://github.com/python/importlib_metadata/commit/107f9029fd5807c6579b881db19e11a0488f0675
-importlib-metadata = "<3"
-isort = "<5"
-# workaround https://github.com/pytest-dev/pytest/issues/3953
-pathlib2 = {version = "*", markers="python_version < '3.6'"}
-# https://github.com/PyCQA/pylint/commit/6e2de8e3a2e2c5586e876ca305f0844bdd822db3
-pylint = "<2.7"
-# https://github.com/pytest-dev/pytest/commit/179f4326df2b644f0ab73f78e4770dafcbdcd89f#diff-fa602a8a75dc9dcc92261bac5f533c2a85e34fcceaff63b3a3a81d9acde2fc52R52
-pytest = "<6.2"
-# https://github.com/jaraco/zipp/commit/05a3c52b4d41690e0471a2e283cffb500dc0329a
-zipp = "<2"
+# python3.6 compatibility
+importlib-metadata = "<4.9"
+platformdirs = "<2.4.1"
+zipp = "<3.7"
+# mypy on python<3.8
+typed-ast = {markers = "python_version < '3.8'"}
 
 [requires]
 python_version = "3"

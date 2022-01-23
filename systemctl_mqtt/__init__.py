@@ -48,6 +48,7 @@ _LOGGER = logging.getLogger(__name__)
 class _State:
     def __init__(
         self,
+        *,
         mqtt_topic_prefix: str,
         homeassistant_discovery_prefix: str,
         homeassistant_node_id: str,
@@ -56,10 +57,10 @@ class _State:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
         self._homeassistant_node_id = homeassistant_node_id
-        self._login_manager = (
+        self._login_manager: dbus.proxies.Interface = (
             systemctl_mqtt._dbus.get_login_manager()
-        )  # type: dbus.proxies.Interface
-        self._shutdown_lock = None  # type: typing.Optional[dbus.types.UnixFd]
+        )
+        self._shutdown_lock: typing.Optional[dbus.types.UnixFd] = None
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
 
@@ -93,7 +94,7 @@ class _State:
         return self.mqtt_topic_prefix + "/preparing-for-shutdown"
 
     def _publish_preparing_for_shutdown(
-        self, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool
+        self, *, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool
     ) -> None:
         # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1199
         topic = self._preparing_for_shutdown_topic
@@ -187,7 +188,7 @@ class _State:
             "payload_on": systemctl_mqtt._mqtt.encode_bool(True),
             "payload_off": systemctl_mqtt._mqtt.encode_bool(False),
             # friendly_name & template for default entity_id
-            "name": "{} preparing for shutdown".format(self._homeassistant_node_id),
+            "name": f"{self._homeassistant_node_id} preparing for shutdown",
         }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         mqtt_client.publish(
@@ -273,6 +274,7 @@ def _mqtt_on_connect(
 
 
 def _run(
+    *,
     mqtt_host: str,
     mqtt_port: int,
     mqtt_username: typing.Optional[str],
@@ -337,9 +339,7 @@ def _main() -> None:
     argparser.add_argument(
         "--mqtt-port",
         type=int,
-        help="default {} ({} with --mqtt-disable-tls)".format(
-            _MQTT_DEFAULT_TLS_PORT, _MQTT_DEFAULT_PORT
-        ),
+        help=f"default {_MQTT_DEFAULT_TLS_PORT} ({_MQTT_DEFAULT_PORT} with --mqtt-disable-tls)",
     )
     argparser.add_argument("--mqtt-username", type=str)
     argparser.add_argument("--mqtt-disable-tls", action="store_true")
@@ -392,12 +392,10 @@ def _main() -> None:
     # pylint: disable=protected-access
     if not systemctl_mqtt._homeassistant.validate_node_id(args.homeassistant_node_id):
         raise ValueError(
-            "invalid home assistant node id {!r} (length >= 1, allowed characters: {})".format(
-                args.homeassistant_node_id,
-                # pylint: disable=protected-access
-                systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS,
-            )
-            + "\nchange --homeassistant-node-id"
+            # pylint: disable=protected-access
+            f"invalid home assistant node id {args.homeassistant_node_id!r} (length >= 1"
+            f", allowed characters: {systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS})"
+            "\nchange --homeassistant-node-id"
         )
     _run(
         mqtt_host=args.mqtt_host,

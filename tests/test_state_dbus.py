@@ -161,7 +161,7 @@ def test_publish_preparing_for_shutdown_homeassistant_config(
         state.publish_preparing_for_shutdown_homeassistant_config(
             mqtt_client=mqtt_client
         )
-    assert mqtt_client.publish.call_count == 1
+    mqtt_client.publish.assert_called_once()
     publish_args, publish_kwargs = mqtt_client.publish.call_args
     assert not publish_args
     assert publish_kwargs["retain"]

@@ -105,7 +105,7 @@ def test__schedule_shutdown(action, delay):
         "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
     ):
         systemctl_mqtt._dbus.schedule_shutdown(action=action, delay=delay)
-    assert login_manager_mock.ScheduleShutdown.call_count == 1
+    login_manager_mock.ScheduleShutdown.assert_called_once()
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == action
@@ -140,14 +140,12 @@ def test__schedule_shutdown_fail(caplog, action, exception_message, log_message)
         systemctl_mqtt._dbus.schedule_shutdown(
             action=action, delay=datetime.timedelta(seconds=21)
         )
-    assert login_manager_mock.ScheduleShutdown.call_count == 1
+    login_manager_mock.ScheduleShutdown.assert_called_once()
     assert len(caplog.records) == 3
     assert caplog.records[0].levelno == logging.INFO
-    assert caplog.records[0].message.startswith("scheduling {} for ".format(action))
+    assert caplog.records[0].message.startswith(f"scheduling {action} for ")
     assert caplog.records[1].levelno == logging.ERROR
-    assert caplog.records[1].message == "failed to schedule {}: {}".format(
-        action, log_message
-    )
+    assert caplog.records[1].message == f"failed to schedule {action}: {log_message}"
     assert "inhibitor" in caplog.records[2].message
 
 

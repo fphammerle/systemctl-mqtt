@@ -44,7 +44,7 @@ def test_mqtt_topic_suffix_action_mapping_poweroff(topic_suffix, expected_action
                 poweroff_delay=datetime.timedelta(),
             )
         )
-    assert login_manager_mock.ScheduleShutdown.call_count == 1
+    login_manager_mock.ScheduleShutdown.assert_called_once()
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert len(schedule_args) == 2
     assert schedule_args[0] == expected_action_arg
