@@ -111,7 +111,7 @@ def test__schedule_shutdown(action, delay):
     assert schedule_args[0] == action
     assert isinstance(schedule_args[1], dbus.UInt64)
     shutdown_datetime = datetime.datetime.fromtimestamp(
-        schedule_args[1] / 10 ** 6, tz=_UTC
+        schedule_args[1] / 10**6, tz=_UTC
     )
     actual_delay = shutdown_datetime - datetime.datetime.now(tz=_UTC)
     assert actual_delay.total_seconds() == pytest.approx(delay.total_seconds(), abs=0.1)

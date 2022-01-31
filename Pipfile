@@ -7,7 +7,7 @@ name = "pypi"
 systemctl-mqtt = {editable = true,path = "."}
 
 [dev-packages]
-black = "==21.12b0"
+black = "*"
 mypy = "*"
 pylint = "*"
 # >=2.0.3 to skip PyGObject's custom loader & fix broken wheel

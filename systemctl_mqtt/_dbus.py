@@ -69,7 +69,7 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
         "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S")
     )
     # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html?highlight=signature#basic-types
-    shutdown_epoch_usec = dbus.UInt64(shutdown_datetime.timestamp() * 10 ** 6)
+    shutdown_epoch_usec = dbus.UInt64(shutdown_datetime.timestamp() * 10**6)
     login_manager = get_login_manager()
     try:
         # $ gdbus introspect --system --dest org.freedesktop.login1 \
