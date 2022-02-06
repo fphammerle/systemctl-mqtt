@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- apparmor profile for architectures other than x86_64/amd64
+  (`ImportError: Error loading [...]/_gi.cpython-38-aarch64-linux-gnu.so: Permission denied`)
 - dockerfile: split `pipenv install` into two stages to speed up image builds
 - dockerfile: `chmod` files copied from host to no longer require `o=rX` perms on host
 - dockerfile: add registry to base image specifier for `podman build`
