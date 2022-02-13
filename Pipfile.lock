@@ -47,9 +47,9 @@
         },
         "pygobject": {
             "hashes": [
-                "sha256:ab030c81278d1ed740b5093d017608316b15fc275f901854b22bcfaf8d40c528"
+                "sha256:b9803991ec0b0b4175e81fee0ad46090fa7af438fe169348a9b18ae53447afcd"
             ],
-            "version": "==3.30.5"
+            "version": "==3.42.0"
         },
         "sanitized-package": {
             "editable": true,
