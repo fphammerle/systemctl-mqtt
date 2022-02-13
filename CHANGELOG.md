@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - dockerfile: `chmod` files copied from host to no longer require `o=rX` perms on host
 - dockerfile: add registry to base image specifier for `podman build`
 - dockerfile: add `--force` flag to `rm` invocation to avoid interactive questions while running `podman build`
+- dockerfile: ignore "sanitized-package" added to `Pipfile.lock` by dependabot
+  (fixes `pipenv.vendor.requirementslib.exceptions.RequirementError: Failed parsing requirement from '.'`)
 
 ### Removed
 - compatibility with `python3.5` & `python3.6`
