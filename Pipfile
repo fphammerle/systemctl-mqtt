@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-systemctl-mqtt = {editable = true,path = "."}
+systemctl-mqtt = {editable = true, path = "."}
 
 # > ImportError: [...]/python3.10/site-packages/gi/_gi.cpython-310-x86_64-linux-gnu.so:
 # . undefined symbol: _PyUnicode_AsStringAndSize
@@ -14,8 +14,6 @@ PyGObject = "!=3.30.5"
 black = "*"
 mypy = "*"
 pylint = "*"
-# >=2.0.3 to skip PyGObject's custom loader & fix broken wheel
-pylint-import-requirements = ">=2.0.3"
 pytest = "*"
 pytest-cov = "*"
 
@@ -23,9 +21,25 @@ pytest-cov = "*"
 # >   File "[...]/lib/python3.10/site-packages/mypy/main.py", line 11, in <module>
 # >     from typing_extensions import Final, NoReturn
 # > ModuleNotFoundError: No module named 'typing_extensions'
-typing-extensions = "*"
-# mypy on python<3.8
-typed-ast = {markers = "python_version < '3.8'"}
+typing-extensions = {markers = ""}
+# python<3.11 compatibility
+# >    File "[...]/lib/python3.10/site-packages/_pytest/_code/code.py", line 60, in <module>
+# >     from exceptiongroup import BaseExceptionGroup
+# > ModuleNotFoundError: No module named 'exceptiongroup'
+exceptiongroup = {markers = "python_version < '3.11'"}
+# >   File "[...]/lib/python3.10/site-packages/_pytest/config/findpaths.py", line 71, in load_config_dict_from_file
+# >     import tomli as tomllib
+# > ModuleNotFoundError: No module named 'tomli'
+tomli = {markers = "python_version < '3.11'"}
+# >   File "[...]/lib/python3.10/site-packages/astroid/decorators.py", line 16, in <module>
+# >     import wrapt
+# > ModuleNotFoundError: No module named 'wrapt'
+wrapt = "*"
+# remove `"markers": "python_version >= '3.11'"` to workaround:
+# >   File "[...]/lib/python3.7/site-packages/pylint/lint/parallel.py", line 13, in <module>
+# >     import dill
+# > ModuleNotFoundError: No module named 'dill'
+dill = {markers = "python_version >= '0'"}
 
 [requires]
 python_version = "3"
