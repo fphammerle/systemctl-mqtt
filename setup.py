@@ -55,7 +55,6 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: POSIX :: Linux",
         # .github/workflows/python.yml
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -67,7 +66,7 @@ setuptools.setup(
         ]
     },
     # >=3.6 variable type hints, f-strings & * to force keyword-only arguments
-    python_requires=">=3.7",  # python<3.7 untested
+    python_requires=">=3.8",  # python<3.8 untested
     # https://dbus.freedesktop.org/doc/dbus-python/news.html
     install_requires=["PyGObject<4", "dbus-python<2", "paho-mqtt<2"],
     setup_requires=["setuptools_scm"],
