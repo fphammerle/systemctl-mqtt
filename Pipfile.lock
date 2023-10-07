@@ -18,10 +18,9 @@
     "default": {
         "dbus-python": {
             "hashes": [
-                "sha256:ad67819308618b5069537be237f8e68ca1c7fcc95ee4a121fe6845b1418248f8"
+                "sha256:92bdd1e68b45596c833307a5ff4b217ee6929a1502f5341bae28fd120acf7260"
             ],
-            "markers": "python_version >= '3.7'",
-            "version": "==1.3.2"
+            "version": "==1.2.18"
         },
         "paho-mqtt": {
             "hashes": [
