@@ -47,7 +47,21 @@ $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
 
 ## Home Assistant 🏡
 
-### Sample Setup
+### Automatic Discovery
+
+When [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
+is enabled (default in Home Assistant ≥0.117.0), the following entities will be
+added automatically:
+- `binary_sensor.[hostname]_logind_preparing_for_shutdown`
+- `button.[hostname]_logind_lock_all_sessions`
+- `button.[hostname]_logind_poweroff`
+
+![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
+
+Pass `--homeassistant-discovery-prefix custom-prefix` to `systemctl-mqtt` when
+using a custom discovery topic prefix.
+
+### Manual YAML Configuration
 
 #### Send Poweroff Command
 
@@ -83,18 +97,6 @@ automation:
     service: switch.turn_off
     entity_id: switch.desk_lamp
 ```
-
-### Automatic Discovery of Shutdown Sensor (Optional)
-
-When [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
-is enabled (default in Home Assistant ≥0.117.0), a new entity
-`binary_sensor.hostname_logind_preparing_for_shutdown` will be added
-automatically.
-
-![homeassistant discovery binary_sensor.hostname_preparing_for_shutdown](docs/homeassistant/preparing-for-shutdown/settings/discovery/2020-06-21.png)
-
-When using a custom discovery topic prefix
-pass `--homeassistant-discovery-prefix custom-prefix` to `systemctl-mqtt`.
 
 ## Docker 🐳
 

@@ -184,6 +184,20 @@ def test_publish_homeassistant_device_config(
                 "state_topic": topic_prefix + "/preparing-for-shutdown",
                 "payload_on": "true",
                 "payload_off": "false",
-            }
+            },
+            "logind/poweroff": {
+                "unique_id": f"systemctl-mqtt-{hostname}-logind-poweroff",
+                "object_id": f"{hostname}_logind_poweroff",
+                "name": "poweroff",
+                "platform": "button",
+                "command_topic": f"{topic_prefix}/poweroff",
+            },
+            "logind/lock-all-sessions": {
+                "unique_id": f"systemctl-mqtt-{hostname}-logind-lock-all-sessions",
+                "object_id": f"{hostname}_logind_lock_all_sessions",
+                "name": "lock all sessions",
+                "platform": "button",
+                "command_topic": f"{topic_prefix}/lock-all-sessions",
+            },
         },
     }

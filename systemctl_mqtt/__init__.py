@@ -188,7 +188,7 @@ class _State:
             "components": {
                 "logind/preparing-for-shutdown": {
                     "unique_id": unique_id_prefix + "-logind-preparing-for-shutdown",
-                    "object_id": f"{hostname}_logind_preparing_for_shutdown",
+                    "object_id": f"{hostname}_logind_preparing_for_shutdown",  # entity id
                     "name": "preparing for shutdown",  # home assistant prepends device name
                     "platform": "binary_sensor",
                     "state_topic": self._preparing_for_shutdown_topic,
@@ -198,6 +198,18 @@ class _State:
                 },
             },
         }
+        for mqtt_topic_suffix in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.keys():
+            # false positive warning by mypy:
+            # > Unsupported target for indexed assignment
+            config["components"]["logind/" + mqtt_topic_suffix] = {  # type: ignore
+                "unique_id": unique_id_prefix + "-logind-" + mqtt_topic_suffix,
+                "object_id": hostname
+                + "_logind_"
+                + mqtt_topic_suffix.replace("-", "_"),  # entity id
+                "name": mqtt_topic_suffix.replace("-", " "),
+                "platform": "button",
+                "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
+            }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
