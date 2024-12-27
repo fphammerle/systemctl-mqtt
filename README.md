@@ -118,9 +118,9 @@ Run `systemctl-mqtt --mqtt-disable-tls …` to disable TLS.
 ## MQTT Authentication
 
 ```sh
+systemctl-mqtt --mqtt-username me --mqtt-password-file /run/secrets/password …
+# or for testing (unsafe):
 systemctl-mqtt --mqtt-username me --mqtt-password secret …
-# or
-systemctl-mqtt --mqtt-username me --mqtt-password-file /var/lib/secrets/mqtt/password …
 ```
 
 ## Adapt Poweroff Delay
