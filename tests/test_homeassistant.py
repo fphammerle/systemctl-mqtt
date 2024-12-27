@@ -25,7 +25,7 @@ import systemctl_mqtt._homeassistant
 
 
 @pytest.mark.parametrize(
-    ("hostname", "expected_node_id"),
+    ("hostname", "expected_object_id"),
     [
         ("raspberrypi", "raspberrypi"),
         ("da-sh", "da-sh"),
@@ -33,15 +33,18 @@ import systemctl_mqtt._homeassistant
         ("someone evil mocked the hostname", "someoneevilmockedthehostname"),
     ],
 )
-def test_get_default_node_id(hostname, expected_node_id):
+def test_get_default_discovery_object_id(hostname, expected_object_id):
     with unittest.mock.patch(
         "systemctl_mqtt._utils.get_hostname", return_value=hostname
     ):
-        assert systemctl_mqtt._homeassistant.get_default_node_id() == expected_node_id
+        assert (
+            systemctl_mqtt._homeassistant.get_default_discovery_object_id()
+            == "systemctl-mqtt-" + expected_object_id
+        )
 
 
 @pytest.mark.parametrize(
-    ("node_id", "valid"),
+    ("object_id", "valid"),
     [
         ("raspberrypi", True),
         ("da-sh", True),
@@ -50,5 +53,7 @@ def test_get_default_node_id(hostname, expected_node_id):
         ("", False),
     ],
 )
-def test_validate_node_id(node_id, valid):
-    assert systemctl_mqtt._homeassistant.validate_node_id(node_id) == valid
+def test_validate_discovery_object_id(object_id, valid):
+    assert (
+        systemctl_mqtt._homeassistant.validate_discovery_object_id(object_id) == valid
+    )

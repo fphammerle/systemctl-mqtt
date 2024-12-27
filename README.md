@@ -86,20 +86,14 @@ automation:
 
 ### Automatic Discovery of Shutdown Sensor (Optional)
 
-After enabling [MQTT device discovery](https://www.home-assistant.io/docs/mqtt/discovery/)
-home assistant will automatically detect a new entity
-`binary_sensor.hostname_preparing_for_shutdown`.
-
-```yaml
-mqtt:
-  broker: BROKER_HOSTNAME_OR_IP_ADDRESS
-  discovery: true # default in home assistant >=v0.117.0
-  # credentials, additional options…
-```
+When [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
+is enabled (default in Home Assistant ≥0.117.0), a new entity
+`binary_sensor.hostname_logind_preparing_for_shutdown` will be added
+automatically.
 
 ![homeassistant discovery binary_sensor.hostname_preparing_for_shutdown](docs/homeassistant/preparing-for-shutdown/settings/discovery/2020-06-21.png)
 
-When using a custom `discovery_prefix`
+When using a custom discovery topic prefix
 pass `--homeassistant-discovery-prefix custom-prefix` to `systemctl-mqtt`.
 
 ## Docker 🐳

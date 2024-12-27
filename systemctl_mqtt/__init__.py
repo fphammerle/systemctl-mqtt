@@ -19,6 +19,7 @@ import abc
 import argparse
 import datetime
 import functools
+import importlib.metadata
 import json
 import logging
 import os
@@ -51,12 +52,12 @@ class _State:
         *,
         mqtt_topic_prefix: str,
         homeassistant_discovery_prefix: str,
-        homeassistant_node_id: str,
+        homeassistant_discovery_object_id: str,
         poweroff_delay: datetime.timedelta,
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
-        self._homeassistant_node_id = homeassistant_node_id
+        self._homeassistant_discovery_object_id = homeassistant_discovery_object_id
         self._login_manager: dbus.proxies.Interface = (
             systemctl_mqtt._dbus.get_login_manager()
         )
@@ -158,41 +159,48 @@ class _State:
             block=False,
         )
 
-    def publish_preparing_for_shutdown_homeassistant_config(
+    def publish_homeassistant_device_config(
         self, mqtt_client: paho.mqtt.client.Client
     ) -> None:
         # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
-        # https://www.home-assistant.io/docs/mqtt/discovery/
+        # https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
         discovery_topic = "/".join(
             (
                 self._homeassistant_discovery_prefix,
-                "binary_sensor",
-                self._homeassistant_node_id,
-                "preparing-for-shutdown",
+                "device",
+                self._homeassistant_discovery_object_id,
                 "config",
             )
         )
-        unique_id = "/".join(
-            (
-                "systemctl-mqtt",
-                self._homeassistant_node_id,
-                "logind",
-                "preparing-for-shutdown",
-            )
+        hostname = (
+            # pylint: disable=protected-access; function in internal module
+            systemctl_mqtt._utils.get_hostname()
         )
-        # https://www.home-assistant.io/integrations/binary_sensor.mqtt/#configuration-variables
+        package_metadata = importlib.metadata.metadata(__name__)
+        unique_id_prefix = "systemctl-mqtt-" + hostname
         config = {
-            "unique_id": unique_id,
-            "state_topic": self._preparing_for_shutdown_topic,
-            # pylint: disable=protected-access
-            "payload_on": systemctl_mqtt._mqtt.encode_bool(True),
-            "payload_off": systemctl_mqtt._mqtt.encode_bool(False),
-            # friendly_name & template for default entity_id
-            "name": f"{self._homeassistant_node_id} preparing for shutdown",
+            "device": {"identifiers": [hostname], "name": hostname},
+            "origin": {
+                "name": package_metadata["Name"],
+                "sw_version": package_metadata["Version"],
+                "support_url": package_metadata["Home-page"],
+            },
+            "components": {
+                "logind/preparing-for-shutdown": {
+                    "unique_id": unique_id_prefix + "-logind-preparing-for-shutdown",
+                    "object_id": f"{hostname}_logind_preparing_for_shutdown",
+                    "name": "preparing for shutdown",  # home assistant prepends device name
+                    "platform": "binary_sensor",
+                    "state_topic": self._preparing_for_shutdown_topic,
+                    # pylint: disable=protected-access
+                    "payload_on": systemctl_mqtt._mqtt.encode_bool(True),
+                    "payload_off": systemctl_mqtt._mqtt.encode_bool(False),
+                },
+            },
         }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         mqtt_client.publish(
-            topic=discovery_topic, payload=json.dumps(config), retain=True
+            topic=discovery_topic, payload=json.dumps(config), retain=False
         )
 
 
@@ -260,7 +268,7 @@ def _mqtt_on_connect(
         state.acquire_shutdown_lock()
     state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client)
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
-    state.publish_preparing_for_shutdown_homeassistant_config(mqtt_client=mqtt_client)
+    state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
@@ -281,7 +289,7 @@ def _run(
     mqtt_password: typing.Optional[str],
     mqtt_topic_prefix: str,
     homeassistant_discovery_prefix: str,
-    homeassistant_node_id: str,
+    homeassistant_discovery_object_id: str,
     poweroff_delay: datetime.timedelta,
     mqtt_disable_tls: bool = False,
 ) -> None:
@@ -293,7 +301,7 @@ def _run(
         userdata=_State(
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix=homeassistant_discovery_prefix,
-            homeassistant_node_id=homeassistant_node_id,
+            homeassistant_discovery_object_id=homeassistant_discovery_object_id,
             poweroff_delay=poweroff_delay,
         )
     )
@@ -333,7 +341,6 @@ def _main() -> None:
     )
     argparser = argparse.ArgumentParser(
         description="MQTT client triggering & reporting shutdown on systemd-based systems",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)
     argparser.add_argument(
@@ -357,21 +364,24 @@ def _main() -> None:
         type=str,
         # pylint: disable=protected-access
         default="systemctl/" + systemctl_mqtt._utils.get_hostname(),
-        help=" ",  # show default
+        help="default: %(default)s",
     )
     # https://www.home-assistant.io/docs/mqtt/discovery/#discovery_prefix
     argparser.add_argument(
-        "--homeassistant-discovery-prefix", type=str, default="homeassistant", help=" "
+        "--homeassistant-discovery-prefix",
+        type=str,
+        default="homeassistant",
+        help="home assistant's prefix for discovery topics" + " (default: %(default)s)",
     )
     argparser.add_argument(
-        "--homeassistant-node-id",
+        "--homeassistant-discovery-object-id",
         type=str,
         # pylint: disable=protected-access
-        default=systemctl_mqtt._homeassistant.get_default_node_id(),
-        help=" ",
+        default=systemctl_mqtt._homeassistant.get_default_discovery_object_id(),
+        help="part of discovery topic (default: %(default)s)",
     )
     argparser.add_argument(
-        "--poweroff-delay-seconds", type=float, default=4.0, help=" "
+        "--poweroff-delay-seconds", type=float, default=4.0, help="default: %(default)s"
     )
     args = argparser.parse_args()
     if args.mqtt_port:
@@ -390,12 +400,16 @@ def _main() -> None:
     else:
         mqtt_password = args.mqtt_password
     # pylint: disable=protected-access
-    if not systemctl_mqtt._homeassistant.validate_node_id(args.homeassistant_node_id):
+    if not systemctl_mqtt._homeassistant.validate_discovery_object_id(
+        args.homeassistant_discovery_object_id
+    ):
         raise ValueError(
             # pylint: disable=protected-access
-            f"invalid home assistant node id {args.homeassistant_node_id!r} (length >= 1"
-            f", allowed characters: {systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS})"
-            "\nchange --homeassistant-node-id"
+            "invalid home assistant discovery object id"
+            f" {args.homeassistant_discovery_object_id!r} (length >= 1"
+            ", allowed characters:"
+            f" {systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS})"
+            "\nchange --homeassistant-discovery-object-id"
         )
     _run(
         mqtt_host=args.mqtt_host,
@@ -405,6 +419,6 @@ def _main() -> None:
         mqtt_password=mqtt_password,
         mqtt_topic_prefix=args.mqtt_topic_prefix,
         homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
-        homeassistant_node_id=args.homeassistant_node_id,
+        homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
         poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
     )

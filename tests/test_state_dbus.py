@@ -18,6 +18,7 @@
 import datetime
 import json
 import logging
+import re
 import unittest.mock
 
 import dbus.types
@@ -34,7 +35,7 @@ def test_shutdown_lock():
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
-            homeassistant_node_id=None,
+            homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
         )
         state._login_manager.Inhibit.return_value = lock_fd
@@ -56,7 +57,7 @@ def test_prepare_for_shutdown_handler(caplog, active):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
-            homeassistant_node_id=None,
+            homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
         )
     mqtt_client_mock = unittest.mock.MagicMock()
@@ -100,7 +101,7 @@ def test_publish_preparing_for_shutdown(active):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
-            homeassistant_node_id=None,
+            homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
         )
     assert state._login_manager == login_manager_mock
@@ -127,7 +128,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
-            homeassistant_node_id=None,
+            homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
         )
     mqtt_client_mock = unittest.mock.MagicMock()
@@ -143,39 +144,46 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
 
 @pytest.mark.parametrize("topic_prefix", ["systemctl/hostname", "hostname/systemctl"])
 @pytest.mark.parametrize("discovery_prefix", ["homeassistant", "home/assistant"])
-@pytest.mark.parametrize("node_id", ["node", "node-id"])
+@pytest.mark.parametrize("object_id", ["raspberrypi", "debian21"])
 @pytest.mark.parametrize("hostname", ["hostname", "host-name"])
-def test_publish_preparing_for_shutdown_homeassistant_config(
-    topic_prefix, discovery_prefix, node_id, hostname
+def test_publish_homeassistant_device_config(
+    topic_prefix, discovery_prefix, object_id, hostname
 ):
     state = systemctl_mqtt._State(
         mqtt_topic_prefix=topic_prefix,
         homeassistant_discovery_prefix=discovery_prefix,
-        homeassistant_node_id=node_id,
+        homeassistant_discovery_object_id=object_id,
         poweroff_delay=datetime.timedelta(),
     )
     mqtt_client = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._utils.get_hostname", return_value=hostname
     ):
-        state.publish_preparing_for_shutdown_homeassistant_config(
-            mqtt_client=mqtt_client
-        )
+        state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
     mqtt_client.publish.assert_called_once()
     publish_args, publish_kwargs = mqtt_client.publish.call_args
     assert not publish_args
-    assert publish_kwargs["retain"]
+    assert not publish_kwargs["retain"]
     assert (
-        publish_kwargs["topic"]
-        == discovery_prefix
-        + "/binary_sensor/"
-        + node_id
-        + "/preparing-for-shutdown/config"
+        publish_kwargs["topic"] == discovery_prefix + "/device/" + object_id + "/config"
     )
-    assert json.loads(publish_kwargs["payload"]) == {
-        "unique_id": "systemctl-mqtt/" + node_id + "/logind/preparing-for-shutdown",
-        "state_topic": topic_prefix + "/preparing-for-shutdown",
-        "payload_on": "true",
-        "payload_off": "false",
-        "name": node_id + " preparing for shutdown",
+    config = json.loads(publish_kwargs["payload"])
+    assert re.match(r"\d+\.\d+\.", config["origin"].pop("sw_version"))
+    assert config == {
+        "origin": {
+            "name": "systemctl-mqtt",
+            "support_url": "https://github.com/fphammerle/systemctl-mqtt",
+        },
+        "device": {"identifiers": [hostname], "name": hostname},
+        "components": {
+            "logind/preparing-for-shutdown": {
+                "unique_id": f"systemctl-mqtt-{hostname}-logind-preparing-for-shutdown",
+                "object_id": f"{hostname}_logind_preparing_for_shutdown",
+                "name": "preparing for shutdown",
+                "platform": "binary_sensor",
+                "state_topic": topic_prefix + "/preparing-for-shutdown",
+                "payload_on": "true",
+                "payload_off": "false",
+            }
+        },
     }

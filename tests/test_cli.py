@@ -159,7 +159,7 @@ def test__main(
         mqtt_password=expected_password,
         mqtt_topic_prefix=expected_topic_prefix or "systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
-        homeassistant_node_id="hostname",
+        homeassistant_discovery_object_id="systemctl-mqtt-hostname",
         poweroff_delay=datetime.timedelta(seconds=4),
     )
 
@@ -206,7 +206,7 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         mqtt_password=expected_password,
         mqtt_topic_prefix="systemctl/hostname",
         homeassistant_discovery_prefix="homeassistant",
-        homeassistant_node_id="hostname",
+        homeassistant_discovery_object_id="systemctl-mqtt-hostname",
         poweroff_delay=datetime.timedelta(seconds=4),
     )
 
@@ -254,13 +254,13 @@ def test__main_homeassistant_discovery_prefix(args, discovery_prefix):
 
 
 @pytest.mark.parametrize(
-    ("args", "node_id"),
+    ("args", "object_id"),
     [
-        ([], "fallback"),
-        (["--homeassistant-node-id", "raspberrypi"], "raspberrypi"),
+        ([], "systemctl-mqtt-fallback"),
+        (["--homeassistant-discovery-object-id", "raspberrypi"], "raspberrypi"),
     ],
 )
-def test__main_homeassistant_node_id(args, node_id):
+def test__main_homeassistant_discovery_object_id(args, object_id):
     with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ), unittest.mock.patch(
@@ -268,14 +268,17 @@ def test__main_homeassistant_node_id(args, node_id):
     ):
         systemctl_mqtt._main()
     run_mock.assert_called_once()
-    assert run_mock.call_args[1]["homeassistant_node_id"] == node_id
+    assert run_mock.call_args[1]["homeassistant_discovery_object_id"] == object_id
 
 
 @pytest.mark.parametrize(
     "args",
-    [["--homeassistant-node-id", "no pe"], ["--homeassistant-node-id", ""]],
+    [
+        ["--homeassistant-discovery-object-id", "no pe"],
+        ["--homeassistant-discovery-object-id", ""],
+    ],
 )
-def test__main_homeassistant_node_id_invalid(args):
+def test__main_homeassistant_discovery_object_id_invalid(args):
     with unittest.mock.patch(
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ):

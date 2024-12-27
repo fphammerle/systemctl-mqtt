@@ -22,14 +22,14 @@ import systemctl_mqtt._utils
 NODE_ID_ALLOWED_CHARS = r"a-zA-Z0-9_-"
 
 
-def get_default_node_id() -> str:
+def get_default_discovery_object_id() -> str:
     return re.sub(
         f"[^{NODE_ID_ALLOWED_CHARS}]",
         "",
         # pylint: disable=protected-access
-        systemctl_mqtt._utils.get_hostname(),
+        "systemctl-mqtt-" + systemctl_mqtt._utils.get_hostname(),
     )
 
 
-def validate_node_id(node_id: str) -> bool:
-    return re.match(f"^[{NODE_ID_ALLOWED_CHARS}]+$", node_id) is not None
+def validate_discovery_object_id(object_id: str) -> bool:
+    return re.match(f"^[{NODE_ID_ALLOWED_CHARS}]+$", object_id) is not None

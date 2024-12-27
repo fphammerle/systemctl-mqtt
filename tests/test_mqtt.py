@@ -35,14 +35,14 @@ import systemctl_mqtt
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
 @pytest.mark.parametrize("homeassistant_discovery_prefix", ["homeassistant"])
-@pytest.mark.parametrize("homeassistant_node_id", ["host", "node"])
+@pytest.mark.parametrize("homeassistant_discovery_object_id", ["host", "node"])
 def test__run(
     caplog,
     mqtt_host,
     mqtt_port,
     mqtt_topic_prefix,
     homeassistant_discovery_prefix,
-    homeassistant_node_id,
+    homeassistant_discovery_object_id,
 ):
     # pylint: disable=too-many-locals,too-many-arguments
     caplog.set_level(logging.DEBUG)
@@ -66,7 +66,7 @@ def test__run(
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix=homeassistant_discovery_prefix,
-            homeassistant_node_id=homeassistant_node_id,
+            homeassistant_discovery_object_id=homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(),
         )
     assert caplog.records[0].levelno == logging.INFO
@@ -131,9 +131,9 @@ def test__run(
         caplog.records[3].message
         == "publishing home assistant config on "
         + homeassistant_discovery_prefix
-        + "/binary_sensor/"
-        + homeassistant_node_id
-        + "/preparing-for-shutdown/config"
+        + "/device/"
+        + homeassistant_discovery_object_id
+        + "/config"
     )
     assert all(r.levelno == logging.INFO for r in caplog.records[4::2])
     assert {r.message for r in caplog.records[4::2]} == {
@@ -169,7 +169,7 @@ def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
             mqtt_password=None,
             mqtt_topic_prefix="systemctl/hosts",
             homeassistant_discovery_prefix="homeassistant",
-            homeassistant_node_id="host",
+            homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
         )
     assert caplog.records[0].levelno == logging.INFO
@@ -195,7 +195,7 @@ def test__run_tls_default():
             mqtt_password=None,
             mqtt_topic_prefix="systemctl/hosts",
             homeassistant_discovery_prefix="homeassistant",
-            homeassistant_node_id="host",
+            homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
         )
     # enabled by default
@@ -227,7 +227,7 @@ def test__run_authentication(
             mqtt_password=mqtt_password,
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix="discovery-prefix",
-            homeassistant_node_id="node-id",
+            homeassistant_discovery_object_id="node-id",
             poweroff_delay=datetime.timedelta(),
         )
     mqtt_loop_forever_mock.assert_called_once()
@@ -260,7 +260,7 @@ def _initialize_mqtt_client(
             mqtt_password=None,
             mqtt_topic_prefix=mqtt_topic_prefix,
             homeassistant_discovery_prefix="discovery-prefix",
-            homeassistant_node_id="node-id",
+            homeassistant_discovery_object_id="node-id",
             poweroff_delay=datetime.timedelta(),
         )
     while threading.active_count() > 1:
@@ -311,7 +311,7 @@ def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_passwor
                 mqtt_password=mqtt_password,
                 mqtt_topic_prefix="prefix",
                 homeassistant_discovery_prefix="discovery-prefix",
-                homeassistant_node_id="node-id",
+                homeassistant_discovery_object_id="node-id",
                 poweroff_delay=datetime.timedelta(),
             )
 

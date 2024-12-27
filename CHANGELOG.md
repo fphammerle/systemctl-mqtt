@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- automatic discovery in home assistant:
+  - replace component-based (topic:
+    `<discovery_prefix>/binary_sensor/<node_id>/preparing-for-shutdown/config`)
+    with device-based discovery (`<discovery_prefix>/device/<object_id>/config`)
+  - replace command-line option `--homeassistant-node-id` with
+    `--homeassistant-discovery-object-id`
+  - rename entity `binary_sensor.[hostname]_preparing_for_shutdown` to
+    `binary_sensor.[hostname]_logind_preparing_for_shutdown`
+  - disable "retain" flag for discovery messages
+    (to avoid reappearing ghost devices)
+
 ### Fixed
 - apparmor profile for architectures other than x86_64/amd64
   (`ImportError: Error loading [...]/_gi.cpython-38-aarch64-linux-gnu.so: Permission denied`)

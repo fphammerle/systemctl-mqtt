@@ -20,7 +20,7 @@ def test_poweroff_trigger(delay):
             state=systemctl_mqtt._State(
                 mqtt_topic_prefix="systemctl/hostname",
                 homeassistant_discovery_prefix="homeassistant",
-                homeassistant_node_id="node",
+                homeassistant_discovery_object_id="node",
                 poweroff_delay=delay,
             )
         )
@@ -40,7 +40,7 @@ def test_mqtt_topic_suffix_action_mapping_poweroff(topic_suffix, expected_action
             state=systemctl_mqtt._State(
                 mqtt_topic_prefix="systemctl/hostname",
                 homeassistant_discovery_prefix="homeassistant",
-                homeassistant_node_id="node",
+                homeassistant_discovery_object_id="node",
                 poweroff_delay=datetime.timedelta(),
             )
         )
