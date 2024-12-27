@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `binary_sensor.[hostname]_logind_preparing_for_shutdown`
   - disable "retain" flag for discovery messages
     (to avoid reappearing ghost devices)
+- docker image:
+  - upgrade alpine base image from 3.13.1 to 3.21.0 including upgrade of python
+    from 3.8 to 3.12
+  - support build without git history by manually setting build argument
+    `SETUPTOOLS_SCM_PRETEND_VERSION`
 
 ### Fixed
 - apparmor profile for architectures other than x86_64/amd64
@@ -33,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (fixes `pipenv.vendor.requirementslib.exceptions.RequirementError: Failed parsing requirement from '.'`)
 
 ### Removed
-- compatibility with `python3.5`, `python3.6` & `python3.7`
+- compatibility with `python3.5`, `python3.6`, `python3.7` & `python3.8`
 
 ## [0.5.0] - 2020-11-06
 ### Added

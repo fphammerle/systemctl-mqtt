@@ -17,10 +17,15 @@ jobs:
     # > By default, this action uses the Git context so you don't need to use
     # > the actions/checkout action to checkout the repository because this
     # > will be done directly by buildkit. [...]
-    # > any file mutation in the steps that precede [...] will be ignored
+    # > any file mutation in the steps that precede [...] will be ignored,
+    # > including processing of the .dockerignore file
     # https://github.com/marketplace/actions/build-and-push-docker-images
+    # > The commit history is not preserved.
+    # https://docs.docker.com/engine/reference/commandline/build/#git-repositories
     - uses: docker/build-push-action@v6.10.0
       with:
+        build-args: | # git history unavailable (see above)
+          SETUPTOOLS_SCM_PRETEND_VERSION=0
         platforms: |
           linux/amd64
           linux/arm/v7

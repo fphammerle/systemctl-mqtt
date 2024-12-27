@@ -28,7 +28,7 @@ from paho.mqtt.client import MQTTMessage
 
 import systemctl_mqtt
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-positional-arguments
 
 
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])

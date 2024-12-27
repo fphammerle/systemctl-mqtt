@@ -2,15 +2,16 @@
 
 # not using python:3.*-alpine cause glib-dev package depends on python3
 # https://pkgs.alpinelinux.org/package/v3.11/main/aarch64/glib-dev
-ARG BASE_IMAGE=docker.io/alpine:3.13.1
+ARG BASE_IMAGE=docker.io/alpine:3.21.0
 ARG SOURCE_DIR_PATH=/systemctl-mqtt
 
 
 # hadolint ignore=DL3006
-FROM $BASE_IMAGE as build
+FROM $BASE_IMAGE AS build
 
 RUN apk add --no-cache \
         cairo-dev `# PyGObject > pycairo` \
+        dbus `# dbus-run-session for dbus-python's build` \
         dbus-dev \
         gcc \
         git `# setuptools_scm` \
@@ -26,7 +27,7 @@ RUN apk add --no-cache \
     && adduser -S build
 
 USER build
-RUN pip3 install --user --no-cache-dir pipenv==2021.5.29
+RUN pip3 install --user --no-cache-dir --break-system-packages pipenv==2024.4.0
 
 ARG SOURCE_DIR_PATH
 COPY --chown=build:nobody Pipfile Pipfile.lock $SOURCE_DIR_PATH/
@@ -35,10 +36,12 @@ ENV PIPENV_CACHE_DIR=/tmp/pipenv-cache \
     PIPENV_VENV_IN_PROJECT=yes-please \
     PATH=/home/build/.local/bin:$PATH
 # `sponge` is not pre-installed
-RUN jq 'del(.default."systemctl-mqtt", .default."sanitized-package")' Pipfile.lock > Pipfile.lock~ \
+RUN jq 'del(.default."systemctl-mqtt")' Pipfile.lock > Pipfile.lock~ \
     && mv Pipfile.lock~ Pipfile.lock \
     && pipenv install --deploy --verbose
 COPY --chown=build:nobody . $SOURCE_DIR_PATH
+# allow manual specification to support build without git history
+ARG SETUPTOOLS_SCM_PRETEND_VERSION=
 RUN pipenv install --deploy --verbose \
     && pipenv graph \
     && pipenv run pip freeze \

@@ -25,7 +25,7 @@ import systemctl_mqtt
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._utils
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-positional-arguments
 
 
 @pytest.mark.parametrize(

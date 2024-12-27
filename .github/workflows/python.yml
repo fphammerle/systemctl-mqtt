@@ -14,16 +14,16 @@ on:
 
 jobs:
   code-format:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.9']
+        python-version: ['3.11']
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - run: pip install --upgrade pipenv==2023.6.18
+    - run: pip install --upgrade pipenv==2024.1.0
     - run: sudo apt-get update
     # TODO exclude dbus-python & PyGObject from pipenv install
     - run: sudo apt-get install --yes --no-install-recommends
@@ -35,11 +35,10 @@ jobs:
     - run: pipenv graph
     - run: pipenv run black --check .
   tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python-version:
-        - '3.8'
         - '3.9'
         - '3.10'
       fail-fast: false
@@ -60,11 +59,14 @@ jobs:
     - run: sudo apt-get install --yes --no-install-recommends
         libdbus-1-dev
         libgirepository1.0-dev
+    # by default pipenv picks the latest version in PATH
     - run: pipenv install --python "$PYTHON_VERSION" --deploy --dev
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}
     - run: pipenv graph
-    - run: pipenv run pytest --cov="$(cat *.egg-info/top_level.txt)" --cov-report=term-missing --cov-fail-under=100
+    - run: >-
+        pipenv run pytest --cov="$(cat *.egg-info/top_level.txt)"
+        --cov-report=term-missing --cov-fail-under=100
     - run: pipenv run pylint "$(cat *.egg-info/top_level.txt)"
     # https://github.com/PyCQA/pylint/issues/352
     - run: pipenv run pylint tests/*

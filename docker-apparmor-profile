@@ -25,10 +25,10 @@ profile systemctl-mqtt flags=(attach_disconnected) {
   # https://jlk.fjfi.cvut.cz/arch/manpages/man/apparmor.d.5#Access_Modes
   /systemctl-mqtt/ r,
   /systemctl-mqtt/** r,
-  /systemctl-mqtt/.venv/lib/python3.8/site-packages/_dbus_bindings.so m,
-  /systemctl-mqtt/.venv/lib/python3.8/site-packages/_dbus_glib_bindings.so m,
-  /systemctl-mqtt/.venv/lib/python3.8/site-packages/gi/_gi.cpython-38-*-linux-gnu.so m,
-  /systemctl-mqtt/.venv/lib/python3.8/site-packages/gi/_gi_cairo.cpython-38-*-linux-gnu.so m,
+  /systemctl-mqtt/.venv/lib/python3.12/site-packages/_dbus_bindings.cpython-312-*-linux-musl.so m,
+  /systemctl-mqtt/.venv/lib/python3.12/site-packages/_dbus_glib_bindings.cpython-312-*-linux-musl.so m,
+  /systemctl-mqtt/.venv/lib/python3.12/site-packages/gi/_gi.cpython-312-*-linux-musl.so m,
+  /systemctl-mqtt/.venv/lib/python3.12/site-packages/gi/_gi_cairo.cpython-312-*-linux-musl.so m,
   # https://presentations.nordisch.org/apparmor/#/25
   /systemctl-mqtt/.venv/bin/systemctl-mqtt rix,
   /etc/** r,

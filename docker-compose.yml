@@ -12,7 +12,7 @@ services:
   broker:
     image: docker.io/eclipse-mosquitto:latest
     user: mosquitto
-    read_only: yes
+    read_only: true
     #ports: ['127.0.0.1:1883:1883/tcp']
     cap_drop: [all]
     security_opt: [no-new-privileges]
