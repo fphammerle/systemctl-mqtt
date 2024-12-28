@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - automatic discovery in home assistant:
   - entity `button.[hostname]_logind_lock_all_sessions`
   - entity `button.[hostname]_logind_poweroff`
-- declare compatibility with `python3.11`
+- declare compatibility with `python3.11` & `python3.12`
 
 ### Changed
 - automatic discovery in home assistant:
