@@ -23,11 +23,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - run: pip install --upgrade pipenv==2024.1.0
-    - run: sudo apt-get update
-    # TODO exclude dbus-python & PyGObject from pipenv install
-    - run: sudo apt-get install --yes --no-install-recommends
-        libdbus-1-dev
-        libgirepository1.0-dev
     - run: pipenv install --python "$PYTHON_VERSION" --deploy --dev
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}
@@ -57,10 +52,6 @@ jobs:
     # > [...]/coverage/inorout.py:507: CoverageWarning:
     # . Module  was never imported. (module-not-imported)
     - run: pip install --upgrade pipenv==2023.6.18
-    - run: sudo apt-get update
-    - run: sudo apt-get install --yes --no-install-recommends
-        libdbus-1-dev
-        libgirepository1.0-dev
     # by default pipenv picks the latest version in PATH
     - run: pipenv install --python "$PYTHON_VERSION" --deploy --dev
       env:

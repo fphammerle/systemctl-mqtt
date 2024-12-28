@@ -18,28 +18,106 @@
 import datetime
 import logging
 
-import dbus
+import jeepney
+import jeepney.io.blocking
 
 _LOGGER = logging.getLogger(__name__)
 
-
-def get_login_manager() -> dbus.proxies.Interface:
-    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html
-    bus = dbus.SystemBus()
-    proxy = bus.get_object(
-        bus_name="org.freedesktop.login1", object_path="/org/freedesktop/login1"
-    )  # type: dbus.proxies.ProxyObject
-    # https://freedesktop.org/wiki/Software/systemd/logind/
-    return dbus.Interface(object=proxy, dbus_interface="org.freedesktop.login1.Manager")
+_LOGIN_MANAGER_OBJECT_PATH = "/org/freedesktop/login1"
+_LOGIN_MANAGER_INTERFACE = "org.freedesktop.login1.Manager"
 
 
-def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
+def get_login_manager_signal_match_rule(member: str) -> jeepney.MatchRule:
+    return jeepney.MatchRule(
+        type="signal",
+        interface=_LOGIN_MANAGER_INTERFACE,
+        member=member,
+        path=_LOGIN_MANAGER_OBJECT_PATH,
+    )
+
+
+class LoginManager(jeepney.MessageGenerator):
+    """
+    https://freedesktop.org/wiki/Software/systemd/logind/
+
+    $ python3 -m jeepney.bindgen \
+        --bus unix:path=/var/run/dbus/system_bus_socket \
+        --name org.freedesktop.login1 --path /org/freedesktop/login1
+    """
+
+    interface = _LOGIN_MANAGER_INTERFACE
+
+    def __init__(self):
+        super().__init__(
+            object_path=_LOGIN_MANAGER_OBJECT_PATH, bus_name="org.freedesktop.login1"
+        )
+
+    # pylint: disable=invalid-name; inherited method names from Manager object
+
+    def ListInhibitors(self) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(remote_obj=self, method="ListInhibitors")
+
+    def LockSessions(self) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(remote_obj=self, method="LockSessions")
+
+    def CanPowerOff(self) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(remote_obj=self, method="CanPowerOff")
+
+    def ScheduleShutdown(
+        self, *, action: str, time: datetime.datetime
+    ) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self,
+            method="ScheduleShutdown",
+            signature="st",
+            body=(action, int(time.timestamp() * 1e6)),  # (type, usec)
+        )
+
+    def Inhibit(
+        self, *, what: str, who: str, why: str, mode: str
+    ) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self,
+            method="Inhibit",
+            signature="ssss",
+            body=(what, who, why, mode),
+        )
+
+    def Get(self, property_name: str) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=jeepney.DBusAddress(
+                object_path=self.object_path,
+                bus_name=self.bus_name,
+                interface="org.freedesktop.DBus.Properties",
+            ),
+            method="Get",
+            signature="ss",
+            body=(self.interface, property_name),
+        )
+
+
+def get_login_manager_proxy() -> jeepney.io.blocking.Proxy:
+    # https://jeepney.readthedocs.io/en/latest/integrate.html
+    # https://gitlab.com/takluyver/jeepney/-/blob/master/examples/aio_notify.py
+    return jeepney.io.blocking.Proxy(
+        msggen=LoginManager(),
+        connection=jeepney.io.blocking.open_dbus_connection(
+            bus="SYSTEM",
+            # > dbus-broker[…]: Peer :1.… is being disconnected as it does not
+            # . support receiving file descriptors it requested.
+            enable_fds=True,
+        ),
+    )
+
+
+def _log_shutdown_inhibitors(login_manager_proxy: jeepney.io.blocking.Proxy) -> None:
     if _LOGGER.getEffectiveLevel() > logging.DEBUG:
         return
     found_inhibitor = False
     try:
         # https://www.freedesktop.org/wiki/Software/systemd/inhibit/
-        for what, who, why, mode, uid, pid in login_manager.ListInhibitors():
+        (inhibitors,) = login_manager_proxy.ListInhibitors()
+        for what, who, why, mode, uid, pid in inhibitors:
             if "shutdown" in what:
                 found_inhibitor = True
                 _LOGGER.debug(
@@ -50,10 +128,8 @@ def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
                     mode,
                     why,
                 )
-    except dbus.DBusException as exc:
-        _LOGGER.warning(
-            "failed to fetch shutdown inhibitors: %s", exc.get_dbus_message()
-        )
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.warning("failed to fetch shutdown inhibitors: %s", exc)
         return
     if not found_inhibitor:
         _LOGGER.debug("no shutdown inhibitor locks found")
@@ -62,15 +138,11 @@ def _log_shutdown_inhibitors(login_manager: dbus.proxies.Interface) -> None:
 def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
     # https://github.com/systemd/systemd/blob/v237/src/systemctl/systemctl.c#L8553
     assert action in ["poweroff", "reboot"], action
-    shutdown_datetime = datetime.datetime.now() + delay
+    time = datetime.datetime.now() + delay
     # datetime.datetime.isoformat(timespec=) not available in python3.5
     # https://github.com/python/cpython/blob/v3.5.9/Lib/datetime.py#L1552
-    _LOGGER.info(
-        "scheduling %s for %s", action, shutdown_datetime.strftime("%Y-%m-%d %H:%M:%S")
-    )
-    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html?highlight=signature#basic-types
-    shutdown_epoch_usec = dbus.UInt64(shutdown_datetime.timestamp() * 10**6)
-    login_manager = get_login_manager()
+    _LOGGER.info("scheduling %s for %s", action, time.strftime("%Y-%m-%d %H:%M:%S"))
+    login_manager = get_login_manager_proxy()
     try:
         # $ gdbus introspect --system --dest org.freedesktop.login1 \
         #       --object-path /org/freedesktop/login1 | grep -A 1 ScheduleShutdown
@@ -84,16 +156,18 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
         #       /org/freedesktop/login1 \
         #       org.freedesktop.login1.Manager.ScheduleShutdown \
         #       string:poweroff "uint64:$(date --date=10min +%s)000000"
-        login_manager.ScheduleShutdown(action, shutdown_epoch_usec)
-    except dbus.DBusException as exc:
-        exc_msg = exc.get_dbus_message()
-        if "authentication required" in exc_msg.lower():
+        login_manager.ScheduleShutdown(action=action, time=time)
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        if (
+            exc.name == "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired"
+            and exc.data == ("Interactive authentication required.",)
+        ):
             _LOGGER.error(
                 "failed to schedule %s: unauthorized; missing polkit authorization rules?",
                 action,
             )
         else:
-            _LOGGER.error("failed to schedule %s: %s", action, exc_msg)
+            _LOGGER.error("failed to schedule %s: %s", action, exc)
     _log_shutdown_inhibitors(login_manager)
 
 
@@ -102,4 +176,4 @@ def lock_all_sessions() -> None:
     $ loginctl lock-sessions
     """
     _LOGGER.info("instruct all sessions to activate screen locks")
-    get_login_manager().LockSessions()
+    get_login_manager_proxy().LockSessions()

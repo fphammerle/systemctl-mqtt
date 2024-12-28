@@ -19,9 +19,10 @@ import datetime
 import json
 import logging
 import re
+import typing
 import unittest.mock
 
-import dbus.types
+import jeepney.wrappers
 import pytest
 
 import systemctl_mqtt
@@ -30,88 +31,47 @@ import systemctl_mqtt
 
 
 def test_shutdown_lock():
-    lock_fd = unittest.mock.MagicMock()
-    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager"):
+    lock_fd = unittest.mock.MagicMock(spec=jeepney.fds.FileDescriptor)
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.get_login_manager_proxy"
+    ) as get_login_manager_mock:
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix=None,
             homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
         )
-        state._login_manager.Inhibit.return_value = lock_fd
+        get_login_manager_mock.return_value.Inhibit.return_value = (lock_fd,)
         state.acquire_shutdown_lock()
     state._login_manager.Inhibit.assert_called_once_with(
-        "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay"
+        what="shutdown",
+        who="systemctl-mqtt",
+        why="Report shutdown via MQTT",
+        mode="delay",
     )
     assert state._shutdown_lock == lock_fd
-    # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
-    lock_fd.take.return_value = "fdnum"
-    with unittest.mock.patch("os.close") as close_mock:
-        state.release_shutdown_lock()
-    close_mock.assert_called_once_with("fdnum")
+    lock_fd.close.assert_not_called()
+    state.release_shutdown_lock()
+    lock_fd.close.assert_called_once_with()
 
 
 @pytest.mark.parametrize("active", [True, False])
-def test_prepare_for_shutdown_handler(caplog, active):
-    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager"):
-        state = systemctl_mqtt._State(
-            mqtt_topic_prefix="any",
-            homeassistant_discovery_prefix=None,
-            homeassistant_discovery_object_id=None,
-            poweroff_delay=datetime.timedelta(),
-        )
-    mqtt_client_mock = unittest.mock.MagicMock()
-    state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client_mock)
-    # pylint: disable=no-member,comparison-with-callable
-    connect_to_signal_kwargs = state._login_manager.connect_to_signal.call_args[1]
-    assert connect_to_signal_kwargs["signal_name"] == "PrepareForShutdown"
-    handler_function = connect_to_signal_kwargs["handler_function"]
-    assert handler_function.func == state._prepare_for_shutdown_handler
-    with unittest.mock.patch.object(
-        state, "acquire_shutdown_lock"
-    ) as acquire_lock_mock, unittest.mock.patch.object(
-        state, "release_shutdown_lock"
-    ) as release_lock_mock:
-        handler_function(dbus.types.Boolean(active))
-    if active:
-        acquire_lock_mock.assert_not_called()
-        release_lock_mock.assert_called_once_with()
-    else:
-        acquire_lock_mock.assert_called_once_with()
-        release_lock_mock.assert_not_called()
-    mqtt_client_mock.publish.assert_called_once_with(
-        topic="any/preparing-for-shutdown",
-        payload="true" if active else "false",
-        retain=True,
-    )
-    assert len(caplog.records) == 1
-    assert caplog.records[0].levelno == logging.ERROR
-    assert caplog.records[0].message.startswith(
-        "failed to publish on any/preparing-for-shutdown"
-    )
-
-
-@pytest.mark.parametrize("active", [True, False])
-def test_publish_preparing_for_shutdown(active):
+def test_publish_preparing_for_shutdown(active: bool) -> None:
     login_manager_mock = unittest.mock.MagicMock()
-    login_manager_mock.Get.return_value = dbus.Boolean(active)
+    login_manager_mock.Get.return_value = (("b", active),)[:]
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
-            homeassistant_discovery_prefix=None,
-            homeassistant_discovery_object_id=None,
+            homeassistant_discovery_prefix="pre/fix",
+            homeassistant_discovery_object_id="obj",
             poweroff_delay=datetime.timedelta(),
         )
     assert state._login_manager == login_manager_mock
     mqtt_client_mock = unittest.mock.MagicMock()
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client_mock)
-    login_manager_mock.Get.assert_called_once_with(
-        "org.freedesktop.login1.Manager",
-        "PreparingForShutdown",
-        dbus_interface="org.freedesktop.DBus.Properties",
-    )
+    login_manager_mock.Get.assert_called_once_with("PreparingForShutdown")
     mqtt_client_mock.publish.assert_called_once_with(
         topic="any/preparing-for-shutdown",
         payload="true" if active else "false",
@@ -119,11 +79,18 @@ def test_publish_preparing_for_shutdown(active):
     )
 
 
+class DBusErrorResponseMock(jeepney.wrappers.DBusErrorResponse):
+    # pylint: disable=missing-class-docstring,super-init-not-called
+    def __init__(self, name: str, data: typing.Any):
+        self.name = name
+        self.data = data
+
+
 def test_publish_preparing_for_shutdown_get_fail(caplog):
     login_manager_mock = unittest.mock.MagicMock()
-    login_manager_mock.Get.side_effect = dbus.DBusException("mocked")
+    login_manager_mock.Get.side_effect = DBusErrorResponseMock("error", ("mocked",))
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
@@ -138,7 +105,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
     assert caplog.records[0].levelno == logging.ERROR
     assert (
         caplog.records[0].message
-        == "failed to read logind's PreparingForShutdown property: mocked"
+        == "failed to read logind's PreparingForShutdown property: [error] ('mocked',)"
     )
 
 
@@ -149,12 +116,13 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
 def test_publish_homeassistant_device_config(
     topic_prefix, discovery_prefix, object_id, hostname
 ):
-    state = systemctl_mqtt._State(
-        mqtt_topic_prefix=topic_prefix,
-        homeassistant_discovery_prefix=discovery_prefix,
-        homeassistant_discovery_object_id=object_id,
-        poweroff_delay=datetime.timedelta(),
-    )
+    with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection"):
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix=topic_prefix,
+            homeassistant_discovery_prefix=discovery_prefix,
+            homeassistant_discovery_object_id=object_id,
+            poweroff_delay=datetime.timedelta(),
+        )
     mqtt_client = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._utils.get_hostname", return_value=hostname

@@ -6,10 +6,6 @@ name = "pypi"
 [packages]
 systemctl-mqtt = {editable = true, path = "."}
 
-# > ImportError: [...]/python3.10/site-packages/gi/_gi.cpython-310-x86_64-linux-gnu.so:
-# . undefined symbol: _PyUnicode_AsStringAndSize
-PyGObject = "!=3.30.5"
-
 [dev-packages]
 black = "*"
 mypy = "*"

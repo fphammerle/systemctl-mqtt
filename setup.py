@@ -65,8 +65,17 @@ setuptools.setup(
     # >=3.6 variable type hints, f-strings & * to force keyword-only arguments
     # >=3.8 importlib.metadata
     python_requires=">=3.9",  # <3.9 untested
-    # https://dbus.freedesktop.org/doc/dbus-python/news.html
-    install_requires=["PyGObject<4", "dbus-python<2", "paho-mqtt<2"],
+    # > Currently, the only main loop supported by dbus-python is GLib.
+    # https://web.archive.org/web/20241228081405/https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
+    # PyGObject depends on pycairo
+    # > When pip-installing systemctl-mqtt on a system without graphics it
+    # > fails as pycairo fails building.
+    # https://web.archive.org/web/20241228083145/https://github.com/fphammerle/systemctl-mqtt/issues/39
+    # > Jeepney is a pure Python D-Bus module. It consists of an IO-free core
+    # > implementing the protocol, and integrations for both blocking I/O and
+    # > for different asynchronous frameworks.
+    # https://web.archive.org/web/20241206000411/https://www.freedesktop.org/wiki/Software/DBusBindings/
+    install_requires=["jeepney>=0.8,<0.9", "paho-mqtt<2"],
     setup_requires=["setuptools_scm"],
     tests_require=["pytest"],
 )

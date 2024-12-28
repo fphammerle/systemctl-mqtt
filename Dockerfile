@@ -10,20 +10,11 @@ ARG SOURCE_DIR_PATH=/systemctl-mqtt
 FROM $BASE_IMAGE AS build
 
 RUN apk add --no-cache \
-        cairo-dev `# PyGObject > pycairo` \
-        dbus `# dbus-run-session for dbus-python's build` \
-        dbus-dev \
-        gcc \
         git `# setuptools_scm` \
-        glib-dev `# dbus-python` \
-        gobject-introspection-dev `# PyGObject` \
         jq `# edit Pipfile.lock` \
-        make `# dbus-python` \
-        musl-dev `# dbus-python` \
         py3-certifi `# pipenv` \
         py3-pip `# pipenv install` \
         py3-virtualenv `# pipenv` \
-        python3-dev `# dbus-python` \
     && adduser -S build
 
 USER build
@@ -60,9 +51,6 @@ FROM $BASE_IMAGE
 
 RUN apk add --no-cache \
         ca-certificates \
-        dbus-libs \
-        glib `# PyGObject` \
-        gobject-introspection `# PyGObject` \
         python3 \
         tini \
     && find / -xdev -type f -perm /u+s -exec chmod -c u-s {} \; \

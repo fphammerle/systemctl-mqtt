@@ -18,7 +18,7 @@ $ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
 
 On debian-based systems, dependencies can optionally be installed via:
 ```sh
-$ sudo apt-get install --no-install-recommends python3-dbus python3-gi python3-paho-mqtt
+$ sudo apt-get install --no-install-recommends python3-jeepney python3-paho-mqtt
 ```
 
 ## Usage

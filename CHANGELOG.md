@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - declare compatibility with `python3.11`, `python3.12` & `python3.13`
 
 ### Changed
+- migrate from [dbus-python](https://gitlab.freedesktop.org/dbus/dbus-python/)
+  to pure-python [jeepney](https://gitlab.com/takluyver/jeepney)
+  (removes indirect dependency on libdbus, glib,
+  [PyGObject](https://gitlab.gnome.org/GNOME/pygobject) and
+  [pycairo](https://github.com/pygobject/pycairo),
+  fixes https://github.com/fphammerle/systemctl-mqtt/issues/39)
 - automatic discovery in home assistant:
   - replace component-based (topic:
     `<discovery_prefix>/binary_sensor/<node_id>/preparing-for-shutdown/config`)

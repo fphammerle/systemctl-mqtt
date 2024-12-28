@@ -28,12 +28,9 @@ import socket
 import threading
 import typing
 
-import dbus
-import dbus.mainloop.glib
-
-# black keeps inserting a blank line above
-# https://pygobject.readthedocs.io/en/latest/getting_started.html#ubuntu-logo-ubuntu-debian-logo-debian
-import gi.repository.GLib  # pylint-import-requirements: imports=PyGObject
+import jeepney
+import jeepney.bus_messages
+import jeepney.io.blocking
 import paho.mqtt.client
 
 import systemctl_mqtt._dbus
@@ -58,10 +55,8 @@ class _State:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
         self._homeassistant_discovery_object_id = homeassistant_discovery_object_id
-        self._login_manager: dbus.proxies.Interface = (
-            systemctl_mqtt._dbus.get_login_manager()
-        )
-        self._shutdown_lock: typing.Optional[dbus.types.UnixFd] = None
+        self._login_manager = systemctl_mqtt._dbus.get_login_manager_proxy()
+        self._shutdown_lock: typing.Optional[jeepney.fds.FileDescriptor] = None
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
 
@@ -77,16 +72,21 @@ class _State:
         with self._shutdown_lock_mutex:
             assert self._shutdown_lock is None
             # https://www.freedesktop.org/wiki/Software/systemd/inhibit/
-            self._shutdown_lock = self._login_manager.Inhibit(
-                "shutdown", "systemctl-mqtt", "Report shutdown via MQTT", "delay"
+            (self._shutdown_lock,) = self._login_manager.Inhibit(
+                what="shutdown",
+                who="systemctl-mqtt",
+                why="Report shutdown via MQTT",
+                mode="delay",
             )
+            assert isinstance(
+                self._shutdown_lock, jeepney.fds.FileDescriptor
+            ), self._shutdown_lock
             _LOGGER.debug("acquired shutdown inhibitor lock")
 
     def release_shutdown_lock(self) -> None:
         with self._shutdown_lock_mutex:
             if self._shutdown_lock:
-                # https://dbus.freedesktop.org/doc/dbus-python/dbus.types.html#dbus.types.UnixFd.take
-                os.close(self._shutdown_lock.take())
+                self._shutdown_lock.close()
                 _LOGGER.debug("released shutdown inhibitor lock")
                 self._shutdown_lock = None
 
@@ -113,10 +113,9 @@ class _State:
                 "failed to publish on %s (return code %d)", topic, msg_info.rc
             )
 
-    def _prepare_for_shutdown_handler(
-        self, active: dbus.Boolean, mqtt_client: paho.mqtt.client.Client
+    def preparing_for_shutdown_handler(
+        self, active: bool, mqtt_client: paho.mqtt.client.Client
     ) -> None:
-        assert isinstance(active, dbus.Boolean)
         active = bool(active)
         self._publish_preparing_for_shutdown(
             mqtt_client=mqtt_client, active=active, block=True
@@ -126,35 +125,21 @@ class _State:
         else:
             self.acquire_shutdown_lock()
 
-    def register_prepare_for_shutdown_handler(
-        self, mqtt_client: paho.mqtt.client.Client
-    ) -> None:
-        self._login_manager.connect_to_signal(
-            signal_name="PrepareForShutdown",
-            handler_function=functools.partial(
-                self._prepare_for_shutdown_handler, mqtt_client=mqtt_client
-            ),
-        )
-
     def publish_preparing_for_shutdown(
         self, mqtt_client: paho.mqtt.client.Client
     ) -> None:
         try:
-            active = self._login_manager.Get(
-                "org.freedesktop.login1.Manager",
-                "PreparingForShutdown",
-                dbus_interface="org.freedesktop.DBus.Properties",
-            )
-        except dbus.DBusException as exc:
+            ((return_type, active),) = self._login_manager.Get("PreparingForShutdown")
+        except jeepney.wrappers.DBusErrorResponse as exc:
             _LOGGER.error(
-                "failed to read logind's PreparingForShutdown property: %s",
-                exc.get_dbus_message(),
+                "failed to read logind's PreparingForShutdown property: %s", exc
             )
             return
-        assert isinstance(active, dbus.Boolean), active
+        assert return_type == "b", return_type
+        assert isinstance(active, bool), active
         self._publish_preparing_for_shutdown(
             mqtt_client=mqtt_client,
-            active=bool(active),
+            active=active,
             # https://github.com/eclipse/paho.mqtt.python/issues/439#issuecomment-565514393
             block=False,
         )
@@ -278,7 +263,6 @@ def _mqtt_on_connect(
     _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
     if not state.shutdown_lock_acquired:
         state.acquire_shutdown_lock()
-    state.register_prepare_for_shutdown_handler(mqtt_client=mqtt_client)
     state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
     state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
@@ -293,7 +277,7 @@ def _mqtt_on_connect(
         )
 
 
-def _run(
+def _run(  # pylint: disable=too-many-arguments
     *,
     mqtt_host: str,
     mqtt_port: int,
@@ -305,18 +289,24 @@ def _run(
     poweroff_delay: datetime.timedelta,
     mqtt_disable_tls: bool = False,
 ) -> None:
-    # pylint: disable=too-many-arguments
-    # https://dbus.freedesktop.org/doc/dbus-python/tutorial.html#setting-up-an-event-loop
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    # https://pypi.org/project/paho-mqtt/
-    mqtt_client = paho.mqtt.client.Client(
-        userdata=_State(
-            mqtt_topic_prefix=mqtt_topic_prefix,
-            homeassistant_discovery_prefix=homeassistant_discovery_prefix,
-            homeassistant_discovery_object_id=homeassistant_discovery_object_id,
-            poweroff_delay=poweroff_delay,
-        )
+    # pylint: disable=too-many-locals; will be split up when switching to async mqtt
+    dbus_connection = jeepney.io.blocking.open_dbus_connection(bus="SYSTEM")
+    bus_proxy = jeepney.io.blocking.Proxy(
+        msggen=jeepney.bus_messages.message_bus, connection=dbus_connection
     )
+    preparing_for_shutdown_match_rule = (
+        # pylint: disable=protected-access
+        systemctl_mqtt._dbus.get_login_manager_signal_match_rule("PrepareForShutdown")
+    )
+    assert bus_proxy.AddMatch(preparing_for_shutdown_match_rule) == ()
+    state = _State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix=homeassistant_discovery_prefix,
+        homeassistant_discovery_object_id=homeassistant_discovery_object_id,
+        poweroff_delay=poweroff_delay,
+    )
+    # https://pypi.org/project/paho-mqtt/
+    mqtt_client = paho.mqtt.client.Client(userdata=state)
     mqtt_client.on_connect = _mqtt_on_connect
     if not mqtt_disable_tls:
         mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
@@ -337,7 +327,12 @@ def _run(
     # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
     mqtt_client.loop_start()
     try:
-        gi.repository.GLib.MainLoop().run()
+        with dbus_connection.filter(preparing_for_shutdown_match_rule) as queue:
+            while True:
+                (preparing_for_sleep,) = dbus_connection.recv_until_filtered(queue).body
+                state.preparing_for_shutdown_handler(
+                    active=preparing_for_sleep, mqtt_client=mqtt_client
+                )
     finally:
         # blocks until loop_forever stops
         _LOGGER.debug("waiting for MQTT loop to stop")
