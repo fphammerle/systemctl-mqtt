@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - suspend when receiving message on topic `systemctl/[hostname]/suspend`
   (https://github.com/fphammerle/systemctl-mqtt/issues/97)
-- command-line option `--log-level {debug,info,warning,error,critical}`
 - automatic discovery in home assistant:
   - entity `button.[hostname]_logind_lock_all_sessions`
   - entity `button.[hostname]_logind_poweroff`
   - entity `button.[hostname]_logind_suspend`
+- command-line option `--log-level {debug,info,warning,error,critical}`
 - declare compatibility with `python3.11`, `python3.12` & `python3.13`
 
 ### Changed
@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     from 3.8 to 3.12
   - support build without git history by manually setting build argument
     `SETUPTOOLS_SCM_PRETEND_VERSION`
+- changed default log level from `debug` to `info`
 
 ### Fixed
 - apparmor profile for architectures other than x86_64/amd64

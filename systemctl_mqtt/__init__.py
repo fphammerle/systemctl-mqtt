@@ -366,8 +366,8 @@ def _main() -> None:
     argparser.add_argument(
         "--log-level",
         choices=_ARGUMENT_LOG_LEVEL_MAPPING.keys(),
-        default="debug",
-        help="log level (default: debug)",
+        default="info",
+        help="log level (default: %(default)s)",
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)
     argparser.add_argument(

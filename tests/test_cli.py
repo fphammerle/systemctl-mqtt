@@ -32,7 +32,7 @@ import systemctl_mqtt._utils
 @pytest.mark.parametrize(
     ("args", "log_level"),
     [
-        ([], logging.DEBUG),
+        ([], logging.INFO),
         (["--log-level", "debug"], logging.DEBUG),
         (["--log-level", "info"], logging.INFO),
         (["--log-level", "warning"], logging.WARNING),
