@@ -17,6 +17,7 @@
 
 import abc
 import argparse
+import asyncio
 import datetime
 import functools
 import importlib.metadata
@@ -291,7 +292,7 @@ def _mqtt_on_connect(
         )
 
 
-def _run(  # pylint: disable=too-many-arguments
+async def _run(  # pylint: disable=too-many-arguments
     *,
     mqtt_host: str,
     mqtt_port: int,
@@ -439,14 +440,16 @@ def _main() -> None:
             f" {systemctl_mqtt._homeassistant.NODE_ID_ALLOWED_CHARS})"
             "\nchange --homeassistant-discovery-object-id"
         )
-    _run(
-        mqtt_host=args.mqtt_host,
-        mqtt_port=mqtt_port,
-        mqtt_disable_tls=args.mqtt_disable_tls,
-        mqtt_username=args.mqtt_username,
-        mqtt_password=mqtt_password,
-        mqtt_topic_prefix=args.mqtt_topic_prefix,
-        homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
-        homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
-        poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
+    asyncio.run(
+        _run(
+            mqtt_host=args.mqtt_host,
+            mqtt_port=mqtt_port,
+            mqtt_disable_tls=args.mqtt_disable_tls,
+            mqtt_username=args.mqtt_username,
+            mqtt_password=mqtt_password,
+            mqtt_topic_prefix=args.mqtt_topic_prefix,
+            homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
+            homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
+            poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
+        )
     )

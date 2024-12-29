@@ -44,12 +44,13 @@ def mock_open_dbus_connection() -> typing.Iterator[unittest.mock.MagicMock]:
         yield mock
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
 @pytest.mark.parametrize("homeassistant_discovery_prefix", ["homeassistant"])
 @pytest.mark.parametrize("homeassistant_discovery_object_id", ["host", "node"])
-def test__run(
+async def test__run(
     caplog,
     mqtt_host,
     mqtt_port,
@@ -72,8 +73,8 @@ def test__run(
         ssl_wrap_socket_mock.return_value.send = len
         login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
         login_manager_mock.Get.return_value = (("b", False),)
-        with pytest.raises(StopIteration):
-            systemctl_mqtt._run(
+        with pytest.raises(RuntimeError, match=r"^coroutine raised StopIteration$"):
+            await systemctl_mqtt._run(
                 mqtt_host=mqtt_host,
                 mqtt_port=mqtt_port,
                 mqtt_username=None,
@@ -171,15 +172,18 @@ def test__run(
     assert mqtt_client._thread is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_disable_tls", [True, False])
-def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
+async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
     caplog.set_level(logging.INFO)
     with unittest.mock.patch(
         "paho.mqtt.client.Client"
-    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(StopIteration):
-        systemctl_mqtt._run(
+    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(
+        RuntimeError, match=r"^coroutine raised StopIteration$"
+    ):
+        await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
             mqtt_disable_tls=mqtt_disable_tls,
@@ -201,11 +205,14 @@ def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
         mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
 
 
-def test__run_tls_default():
+@pytest.mark.asyncio
+async def test__run_tls_default():
     with unittest.mock.patch(
         "paho.mqtt.client.Client"
-    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(StopIteration):
-        systemctl_mqtt._run(
+    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(
+        RuntimeError, match=r"^coroutine raised StopIteration$"
+    ):
+        await systemctl_mqtt._run(
             mqtt_host="mqtt-broker.local",
             mqtt_port=1833,
             # mqtt_disable_tls default,
@@ -220,12 +227,13 @@ def test__run_tls_default():
     mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_username", ["me"])
 @pytest.mark.parametrize("mqtt_password", [None, "secret"])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
-def test__run_authentication(
+async def test__run_authentication(
     mqtt_host, mqtt_port, mqtt_username, mqtt_password, mqtt_topic_prefix
 ):
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
@@ -235,10 +243,10 @@ def test__run_authentication(
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
     ), mock_open_dbus_connection(), pytest.raises(
-        StopIteration
+        RuntimeError, match=r"^coroutine raised StopIteration$"
     ):
         ssl_wrap_socket_mock.return_value.send = len
-        systemctl_mqtt._run(
+        await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
             mqtt_username=mqtt_username,
@@ -257,7 +265,8 @@ def test__run_authentication(
         assert mqtt_client._password is None
 
 
-def _initialize_mqtt_client(
+@pytest.mark.asyncio
+async def _initialize_mqtt_client(
     mqtt_host, mqtt_port, mqtt_topic_prefix
 ) -> paho.mqtt.client.Client:
     with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
@@ -267,14 +276,14 @@ def _initialize_mqtt_client(
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
     ) as get_login_manager_mock, mock_open_dbus_connection(), pytest.raises(
-        StopIteration
+        RuntimeError, match=r"^coroutine raised StopIteration$"
     ):
         ssl_wrap_socket_mock.return_value.send = len
         get_login_manager_mock.return_value.Inhibit.return_value = (
             jeepney.fds.FileDescriptor(-1),
         )
         get_login_manager_mock.return_value.Get.return_value = (("b", True),)
-        systemctl_mqtt._run(
+        await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
             mqtt_username=None,
@@ -293,11 +302,12 @@ def _initialize_mqtt_client(
     return mqtt_client
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
-def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
-    mqtt_client = _initialize_mqtt_client(
+async def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
+    mqtt_client = await _initialize_mqtt_client(
         mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_topic_prefix=mqtt_topic_prefix
     )
     caplog.clear()
@@ -317,15 +327,18 @@ def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix)
     assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_password", ["secret"])
-def test__run_authentication_missing_username(mqtt_host, mqtt_port, mqtt_password):
+async def test__run_authentication_missing_username(
+    mqtt_host, mqtt_port, mqtt_password
+):
     with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
     ), mock_open_dbus_connection():
         with pytest.raises(ValueError, match=r"^Missing MQTT username$"):
-            systemctl_mqtt._run(
+            await systemctl_mqtt._run(
                 mqtt_host=mqtt_host,
                 mqtt_port=mqtt_port,
                 mqtt_username=None,

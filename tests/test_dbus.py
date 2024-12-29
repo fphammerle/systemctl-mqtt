@@ -176,7 +176,8 @@ def test_lock_all_sessions(caplog):
     assert caplog.records[0].message == "instruct all sessions to activate screen locks"
 
 
-def test__run_signal_loop():
+@pytest.mark.asyncio
+async def test__run_signal_loop():
     # pylint: disable=too-many-locals,too-many-arguments
     login_manager_mock = unittest.mock.MagicMock()
     dbus_connection_mock = unittest.mock.MagicMock()
@@ -196,8 +197,8 @@ def test__run_signal_loop():
             jeepney.low_level.Message(header=None, body=(False,)),
         ]
         login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
-        with pytest.raises(StopIteration):
-            systemctl_mqtt._run(
+        with pytest.raises(RuntimeError, match=r"^coroutine raised StopIteration$"):
+            await systemctl_mqtt._run(
                 mqtt_host="localhost",
                 mqtt_port=1833,
                 mqtt_username=None,
