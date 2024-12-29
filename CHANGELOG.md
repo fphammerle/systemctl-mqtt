@@ -6,9 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- suspend when receiving message on topic `systemctl/[hostname]/suspend`
+  (https://github.com/fphammerle/systemctl-mqtt/issues/97)
 - automatic discovery in home assistant:
   - entity `button.[hostname]_logind_lock_all_sessions`
   - entity `button.[hostname]_logind_poweroff`
+  - entity `button.[hostname]_logind_suspend`
 - declare compatibility with `python3.11`, `python3.12` & `python3.13`
 
 ### Changed
@@ -28,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `binary_sensor.[hostname]_logind_preparing_for_shutdown`
   - disable "retain" flag for discovery messages
     (to avoid reappearing ghost devices)
-- docker image:
+- container image / dockerfile:
   - upgrade alpine base image from 3.13.1 to 3.21.0 including upgrade of python
     from 3.8 to 3.12
   - support build without git history by manually setting build argument
@@ -37,12 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - apparmor profile for architectures other than x86_64/amd64
   (`ImportError: Error loading [...]/_gi.cpython-38-aarch64-linux-gnu.so: Permission denied`)
-- dockerfile: split `pipenv install` into two stages to speed up image builds
-- dockerfile: `chmod` files copied from host to no longer require `o=rX` perms on host
-- dockerfile: add registry to base image specifier for `podman build`
-- dockerfile: add `--force` flag to `rm` invocation to avoid interactive questions while running `podman build`
-- dockerfile: ignore "sanitized-package" added to `Pipfile.lock` by dependabot
-  (fixes `pipenv.vendor.requirementslib.exceptions.RequirementError: Failed parsing requirement from '.'`)
+- container image / dockerfile:
+  - split `pipenv install` into two stages to speed up image builds
+  - `chmod` files copied from host to no longer require `o=rX` perms on host
+  - add registry to base image specifier for `podman build`
+  - add `--force` flag to `rm` invocation to avoid interactive questions while
+    running `podman build`
 
 ### Removed
 - compatibility with `python3.5`, `python3.6`, `python3.7` & `python3.8`

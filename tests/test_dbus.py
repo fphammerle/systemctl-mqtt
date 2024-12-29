@@ -151,6 +151,18 @@ def test__schedule_shutdown_fail(
     assert "inhibitor" in caplog.records[2].message
 
 
+def test_suspend(caplog):
+    login_manager_mock = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+    ), caplog.at_level(logging.INFO):
+        systemctl_mqtt._dbus.suspend()
+    login_manager_mock.Suspend.assert_called_once_with(interactive=False)
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.INFO
+    assert caplog.records[0].message == "suspending system"
+
+
 def test_lock_all_sessions(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(

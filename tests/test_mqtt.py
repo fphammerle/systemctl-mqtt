@@ -124,6 +124,7 @@ def test__run(
     assert sorted(mqtt_subscribe_mock.call_args_list) == [
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
+        unittest.mock.call(mqtt_topic_prefix + "/suspend"),
     ]
     assert mqtt_client.on_message is None
     for suffix in ("poweroff", "lock-all-sessions"):
@@ -156,13 +157,13 @@ def test__run(
     assert all(r.levelno == logging.INFO for r in caplog.records[4::2])
     assert {r.message for r in caplog.records[4::2]} == {
         f"subscribing to {mqtt_topic_prefix}/{s}"
-        for s in ("poweroff", "lock-all-sessions")
+        for s in ("poweroff", "lock-all-sessions", "suspend")
     }
     assert all(r.levelno == logging.DEBUG for r in caplog.records[5::2])
     assert {r.message for r in caplog.records[5::2]} == {
         f"registered MQTT callback for topic {mqtt_topic_prefix}/{s}"
         f" triggering {systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s]}"
-        for s in ("poweroff", "lock-all-sessions")
+        for s in ("poweroff", "lock-all-sessions", "suspend")
     }
     open_dbus_connection_mock.return_value.filter.assert_called_once()
     # waited for mqtt loop to stop?

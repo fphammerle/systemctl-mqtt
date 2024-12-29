@@ -73,6 +73,11 @@ class LoginManager(jeepney.MessageGenerator):
             body=(action, int(time.timestamp() * 1e6)),  # (type, usec)
         )
 
+    def Suspend(self, *, interactive: bool) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self, method="Suspend", signature="b", body=(interactive,)
+        )
+
     def Inhibit(
         self, *, what: str, who: str, why: str, mode: str
     ) -> jeepney.low_level.Message:
@@ -169,6 +174,11 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
         else:
             _LOGGER.error("failed to schedule %s: %s", action, exc)
     _log_shutdown_inhibitors(login_manager)
+
+
+def suspend() -> None:
+    _LOGGER.info("suspending system")
+    get_login_manager_proxy().Suspend(interactive=False)
 
 
 def lock_all_sessions() -> None:

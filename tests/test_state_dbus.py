@@ -167,5 +167,12 @@ def test_publish_homeassistant_device_config(
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/lock-all-sessions",
             },
+            "logind/suspend": {
+                "unique_id": f"systemctl-mqtt-{hostname}-logind-suspend",
+                "object_id": f"{hostname}_logind_suspend",
+                "name": "suspend",
+                "platform": "button",
+                "command_topic": f"{topic_prefix}/suspend",
+            },
         },
     }

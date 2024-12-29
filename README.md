@@ -45,6 +45,12 @@ Lock screen by sending a MQTT message to topic `systemctl/hostname/lock-all-sess
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
 ```
 
+### Suspend
+
+```
+$ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/suspend -n
+```
+
 ## Home Assistant 🏡
 
 ### Automatic Discovery
@@ -55,6 +61,7 @@ added automatically:
 - `binary_sensor.[hostname]_logind_preparing_for_shutdown`
 - `button.[hostname]_logind_lock_all_sessions`
 - `button.[hostname]_logind_poweroff`
+- `button.[hostname]_logind_suspend`
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
 

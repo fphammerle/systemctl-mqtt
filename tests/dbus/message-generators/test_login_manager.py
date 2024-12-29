@@ -51,6 +51,7 @@ def mock_open_dbus_connection() -> typing.Iterator[unittest.mock.MagicMock]:
             },
             ("poweroff", 0),
         ),
+        ("Suspend", "b", {"interactive": True}, (True,)),
         (
             "Inhibit",
             "ssss",

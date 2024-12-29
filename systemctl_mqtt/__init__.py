@@ -244,9 +244,19 @@ class _MQTTActionLockAllSessions(_MQTTAction):
         return type(self).__name__
 
 
+class _MQTTActionSuspend(_MQTTAction):
+    def trigger(self, state: _State) -> None:
+        # pylint: disable=protected-access
+        systemctl_mqtt._dbus.suspend()
+
+    def __str__(self) -> str:
+        return type(self).__name__
+
+
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
     "poweroff": _MQTTActionSchedulePoweroff(),
     "lock-all-sessions": _MQTTActionLockAllSessions(),
+    "suspend": _MQTTActionSuspend(),
 }
 
 
