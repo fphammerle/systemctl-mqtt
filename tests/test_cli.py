@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import datetime
+import logging
 import typing
 import unittest.mock
 
@@ -26,6 +27,26 @@ import systemctl_mqtt._homeassistant
 import systemctl_mqtt._utils
 
 # pylint: disable=protected-access,too-many-positional-arguments
+
+
+@pytest.mark.parametrize(
+    ("args", "log_level"),
+    [
+        ([], logging.DEBUG),
+        (["--log-level", "debug"], logging.DEBUG),
+        (["--log-level", "info"], logging.INFO),
+        (["--log-level", "warning"], logging.WARNING),
+        (["--log-level", "error"], logging.ERROR),
+        (["--log-level", "critical"], logging.CRITICAL),
+    ],
+)
+def test__main_log_level(args: typing.List[str], log_level: int) -> None:
+    with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
+        "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
+    ):
+        systemctl_mqtt._main()
+    run_mock.assert_called_once()
+    assert logging.root.getEffectiveLevel() == log_level
 
 
 @pytest.mark.parametrize(

@@ -25,6 +25,7 @@ services:
     #- config:/etc/systemctl-mqtt:ro
     - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:rw
     command: systemctl-mqtt
+      --log-level debug
       --poweroff-delay-seconds 60
       --mqtt-host broker
       --mqtt-disable-tls

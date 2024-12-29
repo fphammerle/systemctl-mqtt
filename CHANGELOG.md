@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - suspend when receiving message on topic `systemctl/[hostname]/suspend`
   (https://github.com/fphammerle/systemctl-mqtt/issues/97)
+- command-line option `--log-level {debug,info,warning,error,critical}`
 - automatic discovery in home assistant:
   - entity `button.[hostname]_logind_lock_all_sessions`
   - entity `button.[hostname]_logind_poweroff`

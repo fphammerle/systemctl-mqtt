@@ -39,6 +39,10 @@ import systemctl_mqtt._mqtt
 
 _MQTT_DEFAULT_PORT = 1883
 _MQTT_DEFAULT_TLS_PORT = 8883
+_ARGUMENT_LOG_LEVEL_MAPPING = {
+    a: getattr(logging, a.upper())
+    for a in ("debug", "info", "warning", "error", "critical")
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -352,12 +356,18 @@ def _run(  # pylint: disable=too-many-arguments
 
 def _main() -> None:
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s:%(levelname)s:%(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S%z",
     )
     argparser = argparse.ArgumentParser(
         description="MQTT client triggering & reporting shutdown on systemd-based systems",
+    )
+    argparser.add_argument(
+        "--log-level",
+        choices=_ARGUMENT_LOG_LEVEL_MAPPING.keys(),
+        default="debug",
+        help="log level (default: debug)",
     )
     argparser.add_argument("--mqtt-host", type=str, required=True)
     argparser.add_argument(
@@ -401,6 +411,7 @@ def _main() -> None:
         "--poweroff-delay-seconds", type=float, default=4.0, help="default: %(default)s"
     )
     args = argparser.parse_args()
+    logging.root.setLevel(_ARGUMENT_LOG_LEVEL_MAPPING[args.log_level])
     if args.mqtt_port:
         mqtt_port = args.mqtt_port
     elif args.mqtt_disable_tls:

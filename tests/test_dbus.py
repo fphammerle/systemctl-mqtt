@@ -94,6 +94,7 @@ def test__schedule_shutdown(action, delay):
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
     ):
+        login_manager_mock.ListInhibitors.return_value = ([],)
         systemctl_mqtt._dbus.schedule_shutdown(action=action, delay=delay)
     login_manager_mock.ScheduleShutdown.assert_called_once()
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
