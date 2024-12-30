@@ -31,7 +31,7 @@ import typing
 
 import jeepney
 import jeepney.bus_messages
-import jeepney.io.blocking
+import jeepney.io.asyncio
 import paho.mqtt.client
 
 import systemctl_mqtt._dbus
@@ -292,6 +292,31 @@ def _mqtt_on_connect(
         )
 
 
+async def _dbus_signal_loop(
+    *, state: _State, mqtt_client: paho.mqtt.client.Client
+) -> None:
+    async with jeepney.io.asyncio.open_dbus_router(bus="SYSTEM") as router:
+        # router: jeepney.io.asyncio.DBusRouter
+        bus_proxy = jeepney.io.asyncio.Proxy(
+            msggen=jeepney.bus_messages.message_bus, router=router
+        )
+        preparing_for_shutdown_match_rule = (
+            # pylint: disable=protected-access
+            systemctl_mqtt._dbus.get_login_manager_signal_match_rule(
+                "PrepareForShutdown"
+            )
+        )
+        assert await bus_proxy.AddMatch(preparing_for_shutdown_match_rule) == ()
+        with router.filter(preparing_for_shutdown_match_rule) as queue:
+            while True:
+                message: jeepney.low_level.Message = await queue.get()
+                (preparing_for_shutdown,) = message.body
+                state.preparing_for_shutdown_handler(
+                    active=preparing_for_shutdown, mqtt_client=mqtt_client
+                )
+                queue.task_done()
+
+
 async def _run(  # pylint: disable=too-many-arguments
     *,
     mqtt_host: str,
@@ -304,16 +329,6 @@ async def _run(  # pylint: disable=too-many-arguments
     poweroff_delay: datetime.timedelta,
     mqtt_disable_tls: bool = False,
 ) -> None:
-    # pylint: disable=too-many-locals; will be split up when switching to async mqtt
-    dbus_connection = jeepney.io.blocking.open_dbus_connection(bus="SYSTEM")
-    bus_proxy = jeepney.io.blocking.Proxy(
-        msggen=jeepney.bus_messages.message_bus, connection=dbus_connection
-    )
-    preparing_for_shutdown_match_rule = (
-        # pylint: disable=protected-access
-        systemctl_mqtt._dbus.get_login_manager_signal_match_rule("PrepareForShutdown")
-    )
-    assert bus_proxy.AddMatch(preparing_for_shutdown_match_rule) == ()
     state = _State(
         mqtt_topic_prefix=mqtt_topic_prefix,
         homeassistant_discovery_prefix=homeassistant_discovery_prefix,
@@ -342,12 +357,7 @@ async def _run(  # pylint: disable=too-many-arguments
     # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
     mqtt_client.loop_start()
     try:
-        with dbus_connection.filter(preparing_for_shutdown_match_rule) as queue:
-            while True:
-                (preparing_for_sleep,) = dbus_connection.recv_until_filtered(queue).body
-                state.preparing_for_shutdown_handler(
-                    active=preparing_for_sleep, mqtt_client=mqtt_client
-                )
+        await _dbus_signal_loop(state=state, mqtt_client=mqtt_client)
     finally:
         # blocks until loop_forever stops
         _LOGGER.debug("waiting for MQTT loop to stop")

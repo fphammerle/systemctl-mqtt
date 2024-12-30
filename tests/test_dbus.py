@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import datetime
 import logging
 import typing
@@ -177,40 +178,44 @@ def test_lock_all_sessions(caplog):
 
 
 @pytest.mark.asyncio
-async def test__run_signal_loop():
+async def test__dbus_signal_loop():
     # pylint: disable=too-many-locals,too-many-arguments
-    login_manager_mock = unittest.mock.MagicMock()
-    dbus_connection_mock = unittest.mock.MagicMock()
+    state_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "paho.mqtt.client.Client"
-    ) as mqtt_client_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
-    ), unittest.mock.patch(
-        "jeepney.io.blocking.open_dbus_connection", return_value=dbus_connection_mock
-    ) as open_dbus_connection_mock:
+        "jeepney.io.asyncio.open_dbus_router",
+    ) as open_dbus_router_mock:
+        async with open_dbus_router_mock() as dbus_router_mock:
+            pass
         add_match_reply = unittest.mock.Mock()
         add_match_reply.body = ()
-        dbus_connection_mock.send_and_get_reply.return_value = add_match_reply
-        dbus_connection_mock.recv_until_filtered.side_effect = [
-            jeepney.low_level.Message(header=None, body=(False,)),
-            jeepney.low_level.Message(header=None, body=(True,)),
-            jeepney.low_level.Message(header=None, body=(False,)),
-        ]
-        login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
-        with pytest.raises(RuntimeError, match=r"^coroutine raised StopIteration$"):
-            await systemctl_mqtt._run(
-                mqtt_host="localhost",
-                mqtt_port=1833,
-                mqtt_username=None,
-                mqtt_password=None,
-                mqtt_topic_prefix="systemctl/host",
-                homeassistant_discovery_prefix="homeassistant",
-                homeassistant_discovery_object_id="test",
-                poweroff_delay=datetime.timedelta(),
+        dbus_router_mock.send_and_get_reply.return_value = add_match_reply
+        msg_queue = asyncio.Queue()
+        await msg_queue.put(jeepney.low_level.Message(header=None, body=(False,)))
+        await msg_queue.put(jeepney.low_level.Message(header=None, body=(True,)))
+        await msg_queue.put(jeepney.low_level.Message(header=None, body=(False,)))
+        dbus_router_mock.filter = unittest.mock.MagicMock()
+        dbus_router_mock.filter.return_value.__enter__.return_value = msg_queue
+        # asyncio.TaskGroup added in python3.11
+        loop_task = asyncio.create_task(
+            systemctl_mqtt._dbus_signal_loop(
+                state=state_mock, mqtt_client=unittest.mock.MagicMock()
             )
-    open_dbus_connection_mock.assert_called_once_with(bus="SYSTEM")
-    dbus_connection_mock.send_and_get_reply.assert_called_once()
-    add_match_msg = dbus_connection_mock.send_and_get_reply.call_args[0][0]
+        )
+
+        async def _abort_after_msg_queue():
+            await msg_queue.join()
+            loop_task.cancel()
+
+        with pytest.raises(asyncio.exceptions.CancelledError):
+            await asyncio.gather(*(loop_task, _abort_after_msg_queue()))
+    assert unittest.mock.call(bus="SYSTEM") in open_dbus_router_mock.call_args_list
+    dbus_router_mock.filter.assert_called_once()
+    (filter_match_rule,) = dbus_router_mock.filter.call_args[0]
+    assert (
+        filter_match_rule.header_fields["interface"] == "org.freedesktop.login1.Manager"
+    )
+    assert filter_match_rule.header_fields["member"] == "PrepareForShutdown"
+    add_match_msg = dbus_router_mock.send_and_get_reply.call_args[0][0]
     assert (
         add_match_msg.header.fields[jeepney.low_level.HeaderFields.member] == "AddMatch"
     )
@@ -218,14 +223,6 @@ async def test__run_signal_loop():
         "interface='org.freedesktop.login1.Manager',member='PrepareForShutdown'"
         ",path='/org/freedesktop/login1',type='signal'",
     )
-    assert mqtt_client_mock().publish.call_args_list == [
-        unittest.mock.call(
-            topic="systemctl/host/preparing-for-shutdown", payload="false", retain=True
-        ),
-        unittest.mock.call(
-            topic="systemctl/host/preparing-for-shutdown", payload="true", retain=True
-        ),
-        unittest.mock.call(
-            topic="systemctl/host/preparing-for-shutdown", payload="false", retain=True
-        ),
-    ]
+    assert [
+        c[1]["active"] for c in state_mock.preparing_for_shutdown_handler.call_args_list
+    ] == [False, True, False]

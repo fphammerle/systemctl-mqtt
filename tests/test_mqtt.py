@@ -15,12 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import contextlib
 import datetime
 import logging
 import threading
 import time
-import typing
 import unittest.mock
 
 import jeepney.fds
@@ -32,16 +30,6 @@ from paho.mqtt.client import MQTTMessage
 import systemctl_mqtt
 
 # pylint: disable=protected-access,too-many-positional-arguments
-
-
-@contextlib.contextmanager
-def mock_open_dbus_connection() -> typing.Iterator[unittest.mock.MagicMock]:
-    with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection") as mock:
-        add_match_reply = unittest.mock.Mock()
-        add_match_reply.body = ()
-        mock.return_value.send_and_get_reply.return_value = add_match_reply
-        mock.return_value.recv_until_filtered.side_effect = []
-        yield mock
 
 
 @pytest.mark.asyncio
@@ -69,21 +57,22 @@ async def test__run(
         "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
-    ), mock_open_dbus_connection() as open_dbus_connection_mock:
+    ), unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop"
+    ) as dbus_signal_loop_mock:
         ssl_wrap_socket_mock.return_value.send = len
         login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
         login_manager_mock.Get.return_value = (("b", False),)
-        with pytest.raises(RuntimeError, match=r"^coroutine raised StopIteration$"):
-            await systemctl_mqtt._run(
-                mqtt_host=mqtt_host,
-                mqtt_port=mqtt_port,
-                mqtt_username=None,
-                mqtt_password=None,
-                mqtt_topic_prefix=mqtt_topic_prefix,
-                homeassistant_discovery_prefix=homeassistant_discovery_prefix,
-                homeassistant_discovery_object_id=homeassistant_discovery_object_id,
-                poweroff_delay=datetime.timedelta(),
-            )
+        await systemctl_mqtt._run(
+            mqtt_host=mqtt_host,
+            mqtt_port=mqtt_port,
+            mqtt_username=None,
+            mqtt_password=None,
+            mqtt_topic_prefix=mqtt_topic_prefix,
+            homeassistant_discovery_prefix=homeassistant_discovery_prefix,
+            homeassistant_discovery_object_id=homeassistant_discovery_object_id,
+            poweroff_delay=datetime.timedelta(),
+        )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
         f"connecting to MQTT broker {mqtt_host}:{mqtt_port} (TLS enabled)"
@@ -113,7 +102,6 @@ async def test__run(
         "paho.mqtt.client.Client.subscribe"
     ) as mqtt_subscribe_mock:
         mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
-    open_dbus_connection_mock.assert_called_once_with(bus="SYSTEM")
     login_manager_mock.Inhibit.assert_called_once_with(
         what="shutdown",
         who="systemctl-mqtt",
@@ -121,7 +109,6 @@ async def test__run(
         mode="delay",
     )
     login_manager_mock.Get.assert_called_once_with("PreparingForShutdown")
-    open_dbus_connection_mock.return_value.send_and_get_reply.assert_called_once()
     assert sorted(mqtt_subscribe_mock.call_args_list) == [
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
@@ -166,7 +153,7 @@ async def test__run(
         f" triggering {systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s]}"
         for s in ("poweroff", "lock-all-sessions", "suspend")
     }
-    open_dbus_connection_mock.return_value.filter.assert_called_once()
+    dbus_signal_loop_mock.assert_awaited_once()
     # waited for mqtt loop to stop?
     assert mqtt_client._thread_terminate
     assert mqtt_client._thread is None
@@ -180,9 +167,9 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
     caplog.set_level(logging.INFO)
     with unittest.mock.patch(
         "paho.mqtt.client.Client"
-    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(
-        RuntimeError, match=r"^coroutine raised StopIteration$"
-    ):
+    ) as mqtt_client_class, unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop"
+    ) as dbus_signal_loop_mock:
         await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -203,15 +190,16 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
         mqtt_client_class().tls_set.assert_not_called()
     else:
         mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
+    dbus_signal_loop_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test__run_tls_default():
     with unittest.mock.patch(
         "paho.mqtt.client.Client"
-    ) as mqtt_client_class, mock_open_dbus_connection(), pytest.raises(
-        RuntimeError, match=r"^coroutine raised StopIteration$"
-    ):
+    ) as mqtt_client_class, unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop"
+    ) as dbus_signal_loop_mock:
         await systemctl_mqtt._run(
             mqtt_host="mqtt-broker.local",
             mqtt_port=1833,
@@ -225,6 +213,7 @@ async def test__run_tls_default():
         )
     # enabled by default
     mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
+    dbus_signal_loop_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -242,9 +231,9 @@ async def test__run_authentication(
         "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
-    ), mock_open_dbus_connection(), pytest.raises(
-        RuntimeError, match=r"^coroutine raised StopIteration$"
-    ):
+    ), unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop"
+    ) as dbus_signal_loop_mock:
         ssl_wrap_socket_mock.return_value.send = len
         await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
@@ -263,6 +252,7 @@ async def test__run_authentication(
         assert mqtt_client._password.decode() == mqtt_password
     else:
         assert mqtt_client._password is None
+    dbus_signal_loop_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -275,8 +265,8 @@ async def _initialize_mqtt_client(
         "paho.mqtt.client.Client.loop_forever", autospec=True
     ) as mqtt_loop_forever_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
-    ) as get_login_manager_mock, mock_open_dbus_connection(), pytest.raises(
-        RuntimeError, match=r"^coroutine raised StopIteration$"
+    ) as get_login_manager_mock, unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop"
     ):
         ssl_wrap_socket_mock.return_value.send = len
         get_login_manager_mock.return_value.Inhibit.return_value = (
@@ -336,7 +326,7 @@ async def test__run_authentication_missing_username(
 ):
     with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
-    ), mock_open_dbus_connection():
+    ), unittest.mock.patch("systemctl_mqtt._dbus_signal_loop") as dbus_signal_loop_mock:
         with pytest.raises(ValueError, match=r"^Missing MQTT username$"):
             await systemctl_mqtt._run(
                 mqtt_host=mqtt_host,
@@ -348,6 +338,7 @@ async def test__run_authentication_missing_username(
                 homeassistant_discovery_object_id="node-id",
                 poweroff_delay=datetime.timedelta(),
             )
+    dbus_signal_loop_mock.assert_not_called()
 
 
 @pytest.mark.parametrize("mqtt_topic", ["system/command/poweroff"])

@@ -56,6 +56,37 @@ def test_shutdown_lock():
 
 
 @pytest.mark.parametrize("active", [True, False])
+def test_preparing_for_shutdown_handler(active: bool) -> None:
+    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager_proxy"):
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="any",
+            homeassistant_discovery_prefix="pre/fix",
+            homeassistant_discovery_object_id="obj",
+            poweroff_delay=datetime.timedelta(),
+        )
+    mqtt_client_mock = unittest.mock.MagicMock()
+    with unittest.mock.patch.object(
+        state, "_publish_preparing_for_shutdown"
+    ) as publish_mock, unittest.mock.patch.object(
+        state, "acquire_shutdown_lock"
+    ) as acquire_lock_mock, unittest.mock.patch.object(
+        state, "release_shutdown_lock"
+    ) as release_lock_mock:
+        state.preparing_for_shutdown_handler(
+            active=active, mqtt_client=mqtt_client_mock
+        )
+    publish_mock.assert_called_once_with(
+        mqtt_client=mqtt_client_mock, active=active, block=True
+    )
+    if active:
+        acquire_lock_mock.assert_not_called()
+        release_lock_mock.assert_called_once_with()
+    else:
+        acquire_lock_mock.assert_called_once_with()
+        release_lock_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("active", [True, False])
 def test_publish_preparing_for_shutdown(active: bool) -> None:
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.return_value = (("b", active),)[:]
