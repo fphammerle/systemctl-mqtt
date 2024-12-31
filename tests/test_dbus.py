@@ -180,7 +180,7 @@ def test_lock_all_sessions(caplog):
 @pytest.mark.asyncio
 async def test__dbus_signal_loop():
     # pylint: disable=too-many-locals,too-many-arguments
-    state_mock = unittest.mock.MagicMock()
+    state_mock = unittest.mock.AsyncMock()
     with unittest.mock.patch(
         "jeepney.io.asyncio.open_dbus_router",
     ) as open_dbus_router_mock:

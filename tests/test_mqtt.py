@@ -17,15 +17,13 @@
 
 import datetime
 import logging
-import threading
-import time
+import ssl
 import unittest.mock
 
+import aiomqtt
 import jeepney.fds
 import jeepney.low_level
-import paho.mqtt.client
 import pytest
-from paho.mqtt.client import MQTTMessage
 
 import systemctl_mqtt
 
@@ -50,17 +48,12 @@ async def test__run(
     caplog.set_level(logging.DEBUG)
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "socket.create_connection"
-    ) as create_socket_mock, unittest.mock.patch(
-        "ssl.SSLContext.wrap_socket", autospec=True
-    ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True
-    ) as mqtt_loop_forever_mock, unittest.mock.patch(
+        "aiomqtt.Client", autospec=False
+    ) as mqtt_client_class_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
     ), unittest.mock.patch(
         "systemctl_mqtt._dbus_signal_loop"
     ) as dbus_signal_loop_mock:
-        ssl_wrap_socket_mock.return_value.send = len
         login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
         login_manager_mock.Get.return_value = (("b", False),)
         await systemctl_mqtt._run(
@@ -77,31 +70,14 @@ async def test__run(
     assert caplog.records[0].message == (
         f"connecting to MQTT broker {mqtt_host}:{mqtt_port} (TLS enabled)"
     )
-    # correct remote?
-    create_socket_mock.assert_called_once()
-    create_socket_args, _ = create_socket_mock.call_args
-    assert create_socket_args[0] == (mqtt_host, mqtt_port)
-    # ssl enabled?
-    ssl_wrap_socket_mock.assert_called_once()
-    ssl_context = ssl_wrap_socket_mock.call_args[0][0]  # self
-    assert ssl_context.check_hostname is True
-    assert ssl_wrap_socket_mock.call_args[1]["server_hostname"] == mqtt_host
-    # loop started?
-    while threading.active_count() > 1:
-        time.sleep(0.01)
-    mqtt_loop_forever_mock.assert_called_once()
-    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
-    assert mqtt_client._tls_insecure is False
-    # credentials
-    assert mqtt_client._username is None
-    assert mqtt_client._password is None
-    # connect callback
-    caplog.clear()
-    mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
-    with unittest.mock.patch(
-        "paho.mqtt.client.Client.subscribe"
-    ) as mqtt_subscribe_mock:
-        mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
+    mqtt_client_class_mock.assert_called_once()
+    _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
+    assert mqtt_client_init_kwargs.pop("hostname") == mqtt_host
+    assert mqtt_client_init_kwargs.pop("port") == mqtt_port
+    assert isinstance(mqtt_client_init_kwargs.pop("tls_context"), ssl.SSLContext)
+    assert mqtt_client_init_kwargs.pop("username") is None
+    assert mqtt_client_init_kwargs.pop("password") is None
+    assert not mqtt_client_init_kwargs
     login_manager_mock.Inhibit.assert_called_once_with(
         what="shutdown",
         who="systemctl-mqtt",
@@ -109,30 +85,29 @@ async def test__run(
         mode="delay",
     )
     login_manager_mock.Get.assert_called_once_with("PreparingForShutdown")
-    assert sorted(mqtt_subscribe_mock.call_args_list) == [
+    async with mqtt_client_class_mock() as mqtt_client_mock:
+        pass
+    assert mqtt_client_mock.publish.call_count == 2
+    assert (
+        mqtt_client_mock.publish.call_args_list[0][1]["topic"]
+        == f"{homeassistant_discovery_prefix}/device/{homeassistant_discovery_object_id}/config"
+    )
+    assert mqtt_client_mock.publish.call_args_list[1] == unittest.mock.call(
+        topic=mqtt_topic_prefix + "/preparing-for-shutdown",
+        payload="false",
+        retain=False,
+    )
+    assert sorted(mqtt_client_mock.subscribe.call_args_list) == [
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
         unittest.mock.call(mqtt_topic_prefix + "/suspend"),
     ]
-    assert mqtt_client.on_message is None
-    for suffix in ("poweroff", "lock-all-sessions"):
-        assert (  # pylint: disable=comparison-with-callable
-            mqtt_client._on_message_filtered[mqtt_topic_prefix + "/" + suffix]
-            == systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
-                suffix
-            ].mqtt_message_callback
-        )
-    assert caplog.records[0].levelno == logging.DEBUG
-    assert (
-        caplog.records[0].message == f"connected to MQTT broker {mqtt_host}:{mqtt_port}"
-    )
     assert caplog.records[1].levelno == logging.DEBUG
-    assert caplog.records[1].message == "acquired shutdown inhibitor lock"
-    assert caplog.records[2].levelno == logging.INFO
     assert (
-        caplog.records[2].message
-        == f"publishing 'false' on {mqtt_topic_prefix}/preparing-for-shutdown"
+        caplog.records[1].message == f"connected to MQTT broker {mqtt_host}:{mqtt_port}"
     )
+    assert caplog.records[2].levelno == logging.DEBUG
+    assert caplog.records[2].message == "acquired shutdown inhibitor lock"
     assert caplog.records[3].levelno == logging.DEBUG
     assert (
         caplog.records[3].message
@@ -142,21 +117,17 @@ async def test__run(
         + homeassistant_discovery_object_id
         + "/config"
     )
-    assert all(r.levelno == logging.INFO for r in caplog.records[4::2])
-    assert {r.message for r in caplog.records[4::2]} == {
+    assert caplog.records[4].levelno == logging.INFO
+    assert (
+        caplog.records[4].message
+        == f"publishing 'false' on {mqtt_topic_prefix}/preparing-for-shutdown"
+    )
+    assert all(r.levelno == logging.INFO for r in caplog.records[5::2])
+    assert {r.message for r in caplog.records[5:]} == {
         f"subscribing to {mqtt_topic_prefix}/{s}"
         for s in ("poweroff", "lock-all-sessions", "suspend")
     }
-    assert all(r.levelno == logging.DEBUG for r in caplog.records[5::2])
-    assert {r.message for r in caplog.records[5::2]} == {
-        f"registered MQTT callback for topic {mqtt_topic_prefix}/{s}"
-        f" triggering {systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[s]}"
-        for s in ("poweroff", "lock-all-sessions", "suspend")
-    }
     dbus_signal_loop_mock.assert_awaited_once()
-    # waited for mqtt loop to stop?
-    assert mqtt_client._thread_terminate
-    assert mqtt_client._thread is None
 
 
 @pytest.mark.asyncio
@@ -166,8 +137,8 @@ async def test__run(
 async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
     caplog.set_level(logging.INFO)
     with unittest.mock.patch(
-        "paho.mqtt.client.Client"
-    ) as mqtt_client_class, unittest.mock.patch(
+        "aiomqtt.Client"
+    ) as mqtt_client_class_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus_signal_loop"
     ) as dbus_signal_loop_mock:
         await systemctl_mqtt._run(
@@ -181,23 +152,30 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
         )
+    mqtt_client_class_mock.assert_called_once()
+    _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
+    assert mqtt_client_init_kwargs.pop("hostname") == mqtt_host
+    assert mqtt_client_init_kwargs.pop("port") == mqtt_port
+    if mqtt_disable_tls:
+        assert mqtt_client_init_kwargs.pop("tls_context") is None
+    else:
+        assert isinstance(mqtt_client_init_kwargs.pop("tls_context"), ssl.SSLContext)
+    assert mqtt_client_init_kwargs.pop("username") is None
+    assert mqtt_client_init_kwargs.pop("password") is None
+    assert not mqtt_client_init_kwargs
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
         f"connecting to MQTT broker {mqtt_host}:{mqtt_port}"
         f" (TLS {'disabled' if mqtt_disable_tls else 'enabled'})"
     )
-    if mqtt_disable_tls:
-        mqtt_client_class().tls_set.assert_not_called()
-    else:
-        mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
     dbus_signal_loop_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test__run_tls_default():
     with unittest.mock.patch(
-        "paho.mqtt.client.Client"
-    ) as mqtt_client_class, unittest.mock.patch(
+        "aiomqtt.Client"
+    ) as mqtt_client_class_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus_signal_loop"
     ) as dbus_signal_loop_mock:
         await systemctl_mqtt._run(
@@ -211,8 +189,11 @@ async def test__run_tls_default():
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
         )
+    mqtt_client_class_mock.assert_called_once()
     # enabled by default
-    mqtt_client_class().tls_set.assert_called_once_with(ca_certs=None)
+    assert isinstance(
+        mqtt_client_class_mock.call_args[1]["tls_context"], ssl.SSLContext
+    )
     dbus_signal_loop_mock.assert_awaited_once()
 
 
@@ -225,16 +206,11 @@ async def test__run_tls_default():
 async def test__run_authentication(
     mqtt_host, mqtt_port, mqtt_username, mqtt_password, mqtt_topic_prefix
 ):
-    with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
-        "ssl.SSLContext.wrap_socket"
-    ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True
-    ) as mqtt_loop_forever_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy"
-    ), unittest.mock.patch(
+    with unittest.mock.patch(
+        "aiomqtt.Client"
+    ) as mqtt_client_class_mock, unittest.mock.patch(
         "systemctl_mqtt._dbus_signal_loop"
     ) as dbus_signal_loop_mock:
-        ssl_wrap_socket_mock.return_value.send = len
         await systemctl_mqtt._run(
             mqtt_host=mqtt_host,
             mqtt_port=mqtt_port,
@@ -245,76 +221,14 @@ async def test__run_authentication(
             homeassistant_discovery_object_id="node-id",
             poweroff_delay=datetime.timedelta(),
         )
-    mqtt_loop_forever_mock.assert_called_once()
-    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
-    assert mqtt_client._username.decode() == mqtt_username
+    mqtt_client_class_mock.assert_called_once()
+    _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
+    assert mqtt_client_init_kwargs["username"] == mqtt_username
     if mqtt_password:
-        assert mqtt_client._password.decode() == mqtt_password
+        assert mqtt_client_init_kwargs["password"] == mqtt_password
     else:
-        assert mqtt_client._password is None
+        assert mqtt_client_init_kwargs["password"] is None
     dbus_signal_loop_mock.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def _initialize_mqtt_client(
-    mqtt_host, mqtt_port, mqtt_topic_prefix
-) -> paho.mqtt.client.Client:
-    with unittest.mock.patch("socket.create_connection"), unittest.mock.patch(
-        "ssl.SSLContext.wrap_socket"
-    ) as ssl_wrap_socket_mock, unittest.mock.patch(
-        "paho.mqtt.client.Client.loop_forever", autospec=True
-    ) as mqtt_loop_forever_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy"
-    ) as get_login_manager_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus_signal_loop"
-    ):
-        ssl_wrap_socket_mock.return_value.send = len
-        get_login_manager_mock.return_value.Inhibit.return_value = (
-            jeepney.fds.FileDescriptor(-1),
-        )
-        get_login_manager_mock.return_value.Get.return_value = (("b", True),)
-        await systemctl_mqtt._run(
-            mqtt_host=mqtt_host,
-            mqtt_port=mqtt_port,
-            mqtt_username=None,
-            mqtt_password=None,
-            mqtt_topic_prefix=mqtt_topic_prefix,
-            homeassistant_discovery_prefix="discovery-prefix",
-            homeassistant_discovery_object_id="node-id",
-            poweroff_delay=datetime.timedelta(),
-        )
-    while threading.active_count() > 1:
-        time.sleep(0.01)
-    mqtt_loop_forever_mock.assert_called_once()
-    (mqtt_client,) = mqtt_loop_forever_mock.call_args[0]
-    mqtt_client.socket().getpeername.return_value = (mqtt_host, mqtt_port)
-    mqtt_client.on_connect(mqtt_client, mqtt_client._userdata, {}, 0)
-    return mqtt_client
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
-@pytest.mark.parametrize("mqtt_port", [1833])
-@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
-async def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_prefix):
-    mqtt_client = await _initialize_mqtt_client(
-        mqtt_host=mqtt_host, mqtt_port=mqtt_port, mqtt_topic_prefix=mqtt_topic_prefix
-    )
-    caplog.clear()
-    caplog.set_level(logging.DEBUG)
-    poweroff_message = MQTTMessage(topic=mqtt_topic_prefix.encode() + b"/poweroff")
-    with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
-    ) as poweroff_trigger_mock:
-        mqtt_client._handle_on_message(poweroff_message)
-    poweroff_trigger_mock.assert_called_once_with(state=mqtt_client._userdata)
-    assert all(r.levelno == logging.DEBUG for r in caplog.records)
-    assert (
-        caplog.records[0].message
-        == f"received topic={poweroff_message.topic} payload=b''"
-    )
-    assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
-    assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
 
 
 @pytest.mark.asyncio
@@ -322,9 +236,9 @@ async def test__client_handle_message(caplog, mqtt_host, mqtt_port, mqtt_topic_p
 @pytest.mark.parametrize("mqtt_port", [1833])
 @pytest.mark.parametrize("mqtt_password", ["secret"])
 async def test__run_authentication_missing_username(
-    mqtt_host, mqtt_port, mqtt_password
-):
-    with unittest.mock.patch("paho.mqtt.client.Client"), unittest.mock.patch(
+    mqtt_host: str, mqtt_port: int, mqtt_password: str
+) -> None:
+    with unittest.mock.patch("aiomqtt.Client"), unittest.mock.patch(
         "systemctl_mqtt._dbus.get_login_manager_proxy"
     ), unittest.mock.patch("systemctl_mqtt._dbus_signal_loop") as dbus_signal_loop_mock:
         with pytest.raises(ValueError, match=r"^Missing MQTT username$"):
@@ -341,82 +255,88 @@ async def test__run_authentication_missing_username(
     dbus_signal_loop_mock.assert_not_called()
 
 
-@pytest.mark.parametrize("mqtt_topic", ["system/command/poweroff"])
-@pytest.mark.parametrize("payload", [b"", b"junk"])
-def test_mqtt_message_callback_poweroff(caplog, mqtt_topic: str, payload: bytes):
-    message = MQTTMessage(topic=mqtt_topic.encode())
-    message.payload = payload
-    with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
-    ) as trigger_mock, caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
-            "poweroff"
-        ].mqtt_message_callback(
-            None, "state_dummy", message  # type: ignore
-        )
-    trigger_mock.assert_called_once_with(state="state_dummy")
-    assert len(caplog.records) == 3
-    assert caplog.records[0].levelno == logging.DEBUG
-    assert caplog.records[0].message == (
-        f"received topic={mqtt_topic} payload={payload!r}"
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
+async def test__mqtt_message_loop_trigger_poweroff(
+    caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str
+) -> None:
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
     )
-    assert caplog.records[1].levelno == logging.DEBUG
-    assert caplog.records[1].message == "executing action _MQTTActionSchedulePoweroff"
-    assert caplog.records[2].levelno == logging.DEBUG
-    assert caplog.records[2].message == "completed action _MQTTActionSchedulePoweroff"
-
-
-@pytest.mark.parametrize("mqtt_topic", ["system/command/poweroff"])
-@pytest.mark.parametrize("payload", [b"", b"junk"])
-def test_mqtt_message_callback_poweroff_retained(
-    caplog, mqtt_topic: str, payload: bytes
-):
-    message = MQTTMessage(topic=mqtt_topic.encode())
-    message.payload = payload
-    message.retain = True
-    with unittest.mock.patch.object(
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["poweroff"], "trigger"
-    ) as trigger_mock, caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[
-            "poweroff"
-        ].mqtt_message_callback(
-            None, None, message  # type: ignore
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic=mqtt_topic_prefix + "/poweroff",
+            payload=b"some-payload",
+            qos=0,
+            retain=False,
+            mid=42 // 2,
+            properties=None,
         )
-    trigger_mock.assert_not_called()
-    assert len(caplog.records) == 2
-    assert caplog.records[0].levelno == logging.DEBUG
-    assert caplog.records[0].message == (
-        f"received topic={mqtt_topic} payload={payload!r}"
-    )
-    assert caplog.records[1].levelno == logging.INFO
-    assert caplog.records[1].message == "ignoring retained message"
-
-
-@pytest.mark.parametrize("active", [True, False])
-@pytest.mark.parametrize("block", [True, False])
-def test__publish_preparing_for_shutdown_blocking(active: bool, block: bool) -> None:
-    login_manager_mock = unittest.mock.MagicMock()
-    login_manager_mock.Get.return_value = (("b", active),)
+    ]
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
-    ):
-        state = systemctl_mqtt._State(
-            mqtt_topic_prefix="prefix",
-            homeassistant_discovery_prefix="prefix",
-            homeassistant_discovery_object_id="object-id",
-            poweroff_delay=datetime.timedelta(),
+        "systemctl_mqtt._dbus.schedule_shutdown"
+    ) as schedule_shutdown_mock, caplog.at_level(logging.DEBUG):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
         )
-    mqtt_client_mock = unittest.mock.MagicMock()
-    state._publish_preparing_for_shutdown(
-        mqtt_client=mqtt_client_mock, active=active, block=block
+    assert sorted(mqtt_client_mock.subscribe.await_args_list) == [
+        unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
+        unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
+        unittest.mock.call(mqtt_topic_prefix + "/suspend"),
+    ]
+    schedule_shutdown_mock.assert_called_once_with(
+        action="poweroff", delay=datetime.timedelta(seconds=21)
     )
-    mqtt_client_mock.publish.assert_called_once_with(
-        topic="prefix/preparing-for-shutdown",
-        payload="true" if active else "false",
-        retain=True,
+    assert [
+        t for t in caplog.record_tuples[2:] if not t[2].startswith("subscribing to ")
+    ] == [
+        (
+            "systemctl_mqtt",
+            logging.DEBUG,
+            f"received message on topic '{mqtt_topic_prefix}/poweroff': b'some-payload'",
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
+async def test__mqtt_message_loop_retained(
+    caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str
+) -> None:
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
     )
-    msg_info = mqtt_client_mock.publish.return_value
-    if block:
-        msg_info.wait_for_publish.assert_called_once()
-    else:
-        msg_info.wait_for_publish.assert_not_called()
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic=mqtt_topic_prefix + "/poweroff",
+            payload=b"some-payload",
+            qos=0,
+            retain=True,
+            mid=42 // 2,
+            properties=None,
+        )
+    ]
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.schedule_shutdown"
+    ) as schedule_shutdown_mock, caplog.at_level(logging.DEBUG):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
+        )
+    schedule_shutdown_mock.assert_not_called()
+    assert [
+        t for t in caplog.record_tuples[2:] if not t[2].startswith("subscribing to ")
+    ] == [
+        (
+            "systemctl_mqtt",
+            logging.INFO,
+            "ignoring retained message on topic 'systemctl/host/poweroff'",
+        ),
+    ]

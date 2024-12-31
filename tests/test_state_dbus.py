@@ -55,8 +55,9 @@ def test_shutdown_lock():
     lock_fd.close.assert_called_once_with()
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("active", [True, False])
-def test_preparing_for_shutdown_handler(active: bool) -> None:
+async def test_preparing_for_shutdown_handler(active: bool) -> None:
     with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager_proxy"):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
@@ -72,12 +73,10 @@ def test_preparing_for_shutdown_handler(active: bool) -> None:
     ) as acquire_lock_mock, unittest.mock.patch.object(
         state, "release_shutdown_lock"
     ) as release_lock_mock:
-        state.preparing_for_shutdown_handler(
+        await state.preparing_for_shutdown_handler(
             active=active, mqtt_client=mqtt_client_mock
         )
-    publish_mock.assert_called_once_with(
-        mqtt_client=mqtt_client_mock, active=active, block=True
-    )
+    publish_mock.assert_awaited_once_with(mqtt_client=mqtt_client_mock, active=active)
     if active:
         acquire_lock_mock.assert_not_called()
         release_lock_mock.assert_called_once_with()
@@ -86,8 +85,9 @@ def test_preparing_for_shutdown_handler(active: bool) -> None:
         release_lock_mock.assert_not_called()
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("active", [True, False])
-def test_publish_preparing_for_shutdown(active: bool) -> None:
+async def test_publish_preparing_for_shutdown(active: bool) -> None:
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.return_value = (("b", active),)[:]
     with unittest.mock.patch(
@@ -100,13 +100,13 @@ def test_publish_preparing_for_shutdown(active: bool) -> None:
             poweroff_delay=datetime.timedelta(),
         )
     assert state._login_manager == login_manager_mock
-    mqtt_client_mock = unittest.mock.MagicMock()
-    state.publish_preparing_for_shutdown(mqtt_client=mqtt_client_mock)
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    await state.publish_preparing_for_shutdown(mqtt_client=mqtt_client_mock)
     login_manager_mock.Get.assert_called_once_with("PreparingForShutdown")
-    mqtt_client_mock.publish.assert_called_once_with(
+    mqtt_client_mock.publish.assert_awaited_once_with(
         topic="any/preparing-for-shutdown",
         payload="true" if active else "false",
-        retain=True,
+        retain=False,
     )
 
 
@@ -117,7 +117,8 @@ class DBusErrorResponseMock(jeepney.wrappers.DBusErrorResponse):
         self.data = data
 
 
-def test_publish_preparing_for_shutdown_get_fail(caplog):
+@pytest.mark.asyncio
+async def test_publish_preparing_for_shutdown_get_fail(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.side_effect = DBusErrorResponseMock("error", ("mocked",))
     with unittest.mock.patch(
@@ -130,7 +131,7 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
             poweroff_delay=datetime.timedelta(),
         )
     mqtt_client_mock = unittest.mock.MagicMock()
-    state.publish_preparing_for_shutdown(mqtt_client=None)
+    await state.publish_preparing_for_shutdown(mqtt_client=None)
     mqtt_client_mock.publish.assert_not_called()
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.ERROR
@@ -140,11 +141,12 @@ def test_publish_preparing_for_shutdown_get_fail(caplog):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("topic_prefix", ["systemctl/hostname", "hostname/systemctl"])
 @pytest.mark.parametrize("discovery_prefix", ["homeassistant", "home/assistant"])
 @pytest.mark.parametrize("object_id", ["raspberrypi", "debian21"])
 @pytest.mark.parametrize("hostname", ["hostname", "host-name"])
-def test_publish_homeassistant_device_config(
+async def test_publish_homeassistant_device_config(
     topic_prefix, discovery_prefix, object_id, hostname
 ):
     with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection"):
@@ -154,11 +156,11 @@ def test_publish_homeassistant_device_config(
             homeassistant_discovery_object_id=object_id,
             poweroff_delay=datetime.timedelta(),
         )
-    mqtt_client = unittest.mock.MagicMock()
+    mqtt_client = unittest.mock.AsyncMock()
     with unittest.mock.patch(
         "systemctl_mqtt._utils.get_hostname", return_value=hostname
     ):
-        state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
+        await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
     mqtt_client.publish.assert_called_once()
     publish_args, publish_kwargs = mqtt_client.publish.call_args
     assert not publish_args

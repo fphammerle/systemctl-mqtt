@@ -75,7 +75,7 @@ setuptools.setup(
     # > implementing the protocol, and integrations for both blocking I/O and
     # > for different asynchronous frameworks.
     # https://web.archive.org/web/20241206000411/https://www.freedesktop.org/wiki/Software/DBusBindings/
-    install_requires=["jeepney>=0.8,<0.9", "paho-mqtt<2"],
+    install_requires=["aiomqtt>=2,<3", "jeepney>=0.8,<0.9"],
     setup_requires=["setuptools_scm"],
     tests_require=["pytest"],
 )

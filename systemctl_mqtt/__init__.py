@@ -26,13 +26,14 @@ import logging
 import os
 import pathlib
 import socket
+import ssl
 import threading
 import typing
 
+import aiomqtt
 import jeepney
 import jeepney.bus_messages
 import jeepney.io.asyncio
-import paho.mqtt.client
 
 import systemctl_mqtt._dbus
 import systemctl_mqtt._homeassistant
@@ -99,40 +100,28 @@ class _State:
     def _preparing_for_shutdown_topic(self) -> str:
         return self.mqtt_topic_prefix + "/preparing-for-shutdown"
 
-    def _publish_preparing_for_shutdown(
-        self, *, mqtt_client: paho.mqtt.client.Client, active: bool, block: bool
+    async def _publish_preparing_for_shutdown(
+        self, *, mqtt_client: aiomqtt.Client, active: bool
     ) -> None:
-        # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1199
         topic = self._preparing_for_shutdown_topic
         # pylint: disable=protected-access
         payload = systemctl_mqtt._mqtt.encode_bool(active)
         _LOGGER.info("publishing %r on %s", payload, topic)
-        msg_info = mqtt_client.publish(
-            topic=topic, payload=payload, retain=True
-        )  # type: paho.mqtt.client.MQTTMessageInfo
-        if not block:
-            return
-        msg_info.wait_for_publish()
-        if msg_info.rc != paho.mqtt.client.MQTT_ERR_SUCCESS:
-            _LOGGER.error(
-                "failed to publish on %s (return code %d)", topic, msg_info.rc
-            )
+        await mqtt_client.publish(topic=topic, payload=payload, retain=False)
 
-    def preparing_for_shutdown_handler(
-        self, active: bool, mqtt_client: paho.mqtt.client.Client
+    async def preparing_for_shutdown_handler(
+        self, active: bool, mqtt_client: aiomqtt.Client
     ) -> None:
         active = bool(active)
-        self._publish_preparing_for_shutdown(
-            mqtt_client=mqtt_client, active=active, block=True
+        await self._publish_preparing_for_shutdown(
+            mqtt_client=mqtt_client, active=active
         )
         if active:
             self.release_shutdown_lock()
         else:
             self.acquire_shutdown_lock()
 
-    def publish_preparing_for_shutdown(
-        self, mqtt_client: paho.mqtt.client.Client
-    ) -> None:
+    async def publish_preparing_for_shutdown(self, mqtt_client: aiomqtt.Client) -> None:
         try:
             ((return_type, active),) = self._login_manager.Get("PreparingForShutdown")
         except jeepney.wrappers.DBusErrorResponse as exc:
@@ -142,15 +131,12 @@ class _State:
             return
         assert return_type == "b", return_type
         assert isinstance(active, bool), active
-        self._publish_preparing_for_shutdown(
-            mqtt_client=mqtt_client,
-            active=active,
-            # https://github.com/eclipse/paho.mqtt.python/issues/439#issuecomment-565514393
-            block=False,
+        await self._publish_preparing_for_shutdown(
+            mqtt_client=mqtt_client, active=active
         )
 
-    def publish_homeassistant_device_config(
-        self, mqtt_client: paho.mqtt.client.Client
+    async def publish_homeassistant_device_config(
+        self, mqtt_client: aiomqtt.Client
     ) -> None:
         # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
         # https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
@@ -201,7 +187,7 @@ class _State:
                 "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
             }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
-        mqtt_client.publish(
+        await mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
         )
 
@@ -211,51 +197,31 @@ class _MQTTAction(metaclass=abc.ABCMeta):
     def trigger(self, state: _State) -> None:
         pass  # pragma: no cover
 
-    def mqtt_message_callback(
-        self,
-        mqtt_client: paho.mqtt.client.Client,
-        state: _State,
-        message: paho.mqtt.client.MQTTMessage,
-    ) -> None:
-        # pylint: disable=unused-argument; callback
-        # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L3416
-        # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L469
-        _LOGGER.debug("received topic=%s payload=%r", message.topic, message.payload)
-        if message.retain:
-            _LOGGER.info("ignoring retained message")
-            return
-        _LOGGER.debug("executing action %s", self)
-        self.trigger(state=state)
-        _LOGGER.debug("completed action %s", self)
+    def __str__(self) -> str:
+        return type(self).__name__
 
 
 class _MQTTActionSchedulePoweroff(_MQTTAction):
+    # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
         systemctl_mqtt._dbus.schedule_shutdown(
             action="poweroff", delay=state.poweroff_delay
         )
 
-    def __str__(self) -> str:
-        return type(self).__name__
-
 
 class _MQTTActionLockAllSessions(_MQTTAction):
+    # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
         systemctl_mqtt._dbus.lock_all_sessions()
 
-    def __str__(self) -> str:
-        return type(self).__name__
-
 
 class _MQTTActionSuspend(_MQTTAction):
+    # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
         systemctl_mqtt._dbus.suspend()
-
-    def __str__(self) -> str:
-        return type(self).__name__
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
@@ -265,36 +231,24 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 }
 
 
-def _mqtt_on_connect(
-    mqtt_client: paho.mqtt.client.Client,
-    state: _State,
-    flags: typing.Dict,
-    return_code: int,
-) -> None:
-    # pylint: disable=unused-argument; callback
-    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L441
-    assert return_code == 0, return_code  # connection accepted
-    mqtt_broker_host, mqtt_broker_port = mqtt_client.socket().getpeername()
-    _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_broker_host, mqtt_broker_port)
-    if not state.shutdown_lock_acquired:
-        state.acquire_shutdown_lock()
-    state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
-    state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
+async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
+    action_by_topic: typing.Dict[str, _MQTTAction] = {}
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
-        mqtt_client.subscribe(topic)
-        mqtt_client.message_callback_add(
-            sub=topic, callback=action.mqtt_message_callback
-        )
-        _LOGGER.debug(
-            "registered MQTT callback for topic %s triggering %s", topic, action
-        )
+        await mqtt_client.subscribe(topic)
+        action_by_topic[topic] = action
+    async for message in mqtt_client.messages:
+        if message.retain:
+            _LOGGER.info("ignoring retained message on topic %r", message.topic.value)
+        else:
+            _LOGGER.debug(
+                "received message on topic %r: %r", message.topic.value, message.payload
+            )
+            action_by_topic[message.topic.value].trigger(state=state)
 
 
-async def _dbus_signal_loop(
-    *, state: _State, mqtt_client: paho.mqtt.client.Client
-) -> None:
+async def _dbus_signal_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
     async with jeepney.io.asyncio.open_dbus_router(bus="SYSTEM") as router:
         # router: jeepney.io.asyncio.DBusRouter
         bus_proxy = jeepney.io.asyncio.Proxy(
@@ -311,7 +265,7 @@ async def _dbus_signal_loop(
             while True:
                 message: jeepney.low_level.Message = await queue.get()
                 (preparing_for_shutdown,) = message.body
-                state.preparing_for_shutdown_handler(
+                await state.preparing_for_shutdown_handler(
                     active=preparing_for_shutdown, mqtt_client=mqtt_client
                 )
                 queue.task_done()
@@ -335,34 +289,35 @@ async def _run(  # pylint: disable=too-many-arguments
         homeassistant_discovery_object_id=homeassistant_discovery_object_id,
         poweroff_delay=poweroff_delay,
     )
-    # https://pypi.org/project/paho-mqtt/
-    mqtt_client = paho.mqtt.client.Client(userdata=state)
-    mqtt_client.on_connect = _mqtt_on_connect
-    if not mqtt_disable_tls:
-        mqtt_client.tls_set(ca_certs=None)  # enable tls trusting default system certs
     _LOGGER.info(
         "connecting to MQTT broker %s:%d (TLS %s)",
         mqtt_host,
         mqtt_port,
         "disabled" if mqtt_disable_tls else "enabled",
     )
-    if mqtt_username:
-        mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
-    elif mqtt_password:
+    if mqtt_password and not mqtt_username:
         raise ValueError("Missing MQTT username")
-    mqtt_client.connect(host=mqtt_host, port=mqtt_port)
-    # loop_start runs loop_forever in a new thread (daemon)
-    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1814
-    # loop_forever attempts to reconnect if disconnected
-    # https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/src/paho/mqtt/client.py#L1744
-    mqtt_client.loop_start()
-    try:
-        await _dbus_signal_loop(state=state, mqtt_client=mqtt_client)
-    finally:
-        # blocks until loop_forever stops
-        _LOGGER.debug("waiting for MQTT loop to stop")
-        mqtt_client.loop_stop()
-        _LOGGER.debug("MQTT loop stopped")
+    async with aiomqtt.Client(  # raises aiomqtt.MqttError
+        hostname=mqtt_host,
+        port=mqtt_port,
+        # > The settings [...] usually represent a higher security level than
+        # > when calling the SSLContext constructor directly.
+        # https://web.archive.org/web/20230714183106/https://docs.python.org/3/library/ssl.html
+        tls_context=None if mqtt_disable_tls else ssl.create_default_context(),
+        username=None if mqtt_username is None else mqtt_username,
+        password=None if mqtt_password is None else mqtt_password,
+    ) as mqtt_client:
+        _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_host, mqtt_port)
+        if not state.shutdown_lock_acquired:
+            state.acquire_shutdown_lock()
+        await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
+        await state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
+        # asyncio.TaskGroup added in python3.11
+        await asyncio.gather(
+            _mqtt_message_loop(state=state, mqtt_client=mqtt_client),
+            _dbus_signal_loop(state=state, mqtt_client=mqtt_client),
+            return_exceptions=False,
+        )
 
 
 def _main() -> None:
