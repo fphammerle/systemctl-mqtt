@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - compatibility with `python3.5`, `python3.6`, `python3.7` & `python3.8`
 
+### Internal
+- pipeline: build container image for armv6 & arm64 (in addition to amd64 & armv7)
+- pipeline: push container images to ghcr.io
+
 ## [0.5.0] - 2020-11-06
 ### Added
 - MQTT message on topic `systemctl/hostname/lock-all-sessions`
