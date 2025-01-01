@@ -21,6 +21,8 @@ import logging
 import jeepney
 import jeepney.io.blocking
 
+import systemctl_mqtt._dbus
+
 _LOGGER = logging.getLogger(__name__)
 
 _LOGIN_MANAGER_OBJECT_PATH = "/org/freedesktop/login1"
@@ -36,7 +38,7 @@ def get_login_manager_signal_match_rule(member: str) -> jeepney.MatchRule:
     )
 
 
-class LoginManager(jeepney.MessageGenerator):
+class LoginManager(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
     """
     https://freedesktop.org/wiki/Software/systemd/logind/
 
@@ -86,18 +88,6 @@ class LoginManager(jeepney.MessageGenerator):
             method="Inhibit",
             signature="ssss",
             body=(what, who, why, mode),
-        )
-
-    def Get(self, property_name: str) -> jeepney.low_level.Message:
-        return jeepney.new_method_call(
-            remote_obj=jeepney.DBusAddress(
-                object_path=self.object_path,
-                bus_name=self.bus_name,
-                interface="org.freedesktop.DBus.Properties",
-            ),
-            method="Get",
-            signature="ss",
-            body=(self.interface, property_name),
         )
 
 

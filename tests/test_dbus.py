@@ -181,24 +181,38 @@ def test_lock_all_sessions(caplog):
     assert caplog.records[0].message == "instruct all sessions to activate screen locks"
 
 
+async def _get_unit_path_mock(  # pylint: disable=unused-argument
+    *, service_manager: jeepney.io.asyncio.Proxy, unit_name: str
+) -> str:
+    return "/org/freedesktop/systemd1/unit/" + unit_name
+
+
 @pytest.mark.asyncio
-async def test__dbus_signal_loop():
+@pytest.mark.parametrize(
+    "monitored_system_unit_names", [[], ["foo.service", "bar.service"]]
+)
+async def test__dbus_signal_loop(monitored_system_unit_names: typing.List[str]) -> None:
     # pylint: disable=too-many-locals,too-many-arguments
     state_mock = unittest.mock.AsyncMock()
     with unittest.mock.patch(
         "jeepney.io.asyncio.open_dbus_router",
-    ) as open_dbus_router_mock:
+    ) as open_dbus_router_mock, unittest.mock.patch(
+        "systemctl_mqtt._get_unit_path", _get_unit_path_mock
+    ), unittest.mock.patch(
+        "systemctl_mqtt._dbus_signal_loop_unit"
+    ) as dbus_signal_loop_unit_mock:
         async with open_dbus_router_mock() as dbus_router_mock:
             pass
         add_match_reply = unittest.mock.Mock()
         add_match_reply.body = ()
         dbus_router_mock.send_and_get_reply.return_value = add_match_reply
-        msg_queue = asyncio.Queue()
+        msg_queue: asyncio.Queue[jeepney.low_level.Message] = asyncio.Queue()
         await msg_queue.put(jeepney.low_level.Message(header=None, body=(False,)))
         await msg_queue.put(jeepney.low_level.Message(header=None, body=(True,)))
         await msg_queue.put(jeepney.low_level.Message(header=None, body=(False,)))
         dbus_router_mock.filter = unittest.mock.MagicMock()
         dbus_router_mock.filter.return_value.__enter__.return_value = msg_queue
+        state_mock.monitored_system_unit_names = monitored_system_unit_names
         # asyncio.TaskGroup added in python3.11
         loop_task = asyncio.create_task(
             systemctl_mqtt._dbus_signal_loop(
@@ -230,3 +244,87 @@ async def test__dbus_signal_loop():
     assert [
         c[1]["active"] for c in state_mock.preparing_for_shutdown_handler.call_args_list
     ] == [False, True, False]
+    assert not any(args for args, _ in dbus_signal_loop_unit_mock.await_args_list)
+    dbus_signal_loop_unit_kwargs = [
+        kwargs for _, kwargs in dbus_signal_loop_unit_mock.await_args_list
+    ]
+    assert [(a["unit_name"], a["unit_path"]) for a in dbus_signal_loop_unit_kwargs] == [
+        (n, f"/org/freedesktop/systemd1/unit/{n}") for n in monitored_system_unit_names
+    ]
+
+
+def _mock_get_active_state_reply(state: str) -> unittest.mock.MagicMock:
+    reply_mock = unittest.mock.MagicMock()
+    reply_mock.body = (("s", state),)
+    return reply_mock
+
+
+@pytest.mark.asyncio
+async def test__dbus_signal_loop_unit() -> None:
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix="prefix",
+        homeassistant_discovery_prefix="unused",
+        homeassistant_discovery_object_id="unused",
+        poweroff_delay=datetime.timedelta(),
+        monitored_system_unit_names=[],
+    )
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    dbus_router_mock = unittest.mock.AsyncMock()
+    bus_proxy_mock = unittest.mock.AsyncMock()
+    bus_proxy_mock.AddMatch.return_value = ()
+    get_active_state_reply_mock = unittest.mock.MagicMock()
+    get_active_state_reply_mock.body = (("s", "active"),)
+    states = [
+        "active",
+        "deactivating",
+        "inactive",
+        "inactive",
+        "activating",
+        "active",
+        "active",
+        "active",
+        "inactive",
+    ]
+    dbus_router_mock.send_and_get_reply.side_effect = [
+        _mock_get_active_state_reply(s) for s in states
+    ]
+    msg_queue: asyncio.Queue[jeepney.low_level.Message] = asyncio.Queue()
+    for _ in range(len(states) - 1):
+        await msg_queue.put(jeepney.low_level.Message(header=None, body=()))
+    dbus_router_mock.filter = unittest.mock.MagicMock()
+    dbus_router_mock.filter.return_value.__enter__.return_value = msg_queue
+    loop_task = asyncio.create_task(
+        systemctl_mqtt._dbus_signal_loop_unit(
+            state=state,
+            mqtt_client=mqtt_client_mock,
+            dbus_router=dbus_router_mock,
+            bus_proxy=bus_proxy_mock,
+            unit_name="foo.service",
+            unit_path="/org/freedesktop/systemd1/unit/whatever.service",
+        )
+    )
+
+    async def _abort_after_msg_queue():
+        await msg_queue.join()
+        loop_task.cancel()
+
+    with pytest.raises(asyncio.exceptions.CancelledError):
+        await asyncio.gather(*(loop_task, _abort_after_msg_queue()))
+    bus_proxy_mock.AddMatch.assert_awaited_once()
+    ((match_rule,), add_match_kwargs) = bus_proxy_mock.AddMatch.await_args
+    assert match_rule.header_fields["interface"] == "org.freedesktop.DBus.Properties"
+    assert match_rule.header_fields["member"] == "PropertiesChanged"
+    assert not add_match_kwargs
+    assert mqtt_client_mock.publish.await_args_list == [
+        unittest.mock.call(
+            topic="prefix/unit/system/foo.service/active-state", payload=s
+        )
+        for s in [  # consecutive duplicates filtered
+            "active",
+            "deactivating",
+            "inactive",
+            "activating",
+            "active",
+            "inactive",
+        ]
+    ]

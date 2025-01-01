@@ -36,6 +36,7 @@ import jeepney.bus_messages
 import jeepney.io.asyncio
 
 import systemctl_mqtt._dbus.login_manager
+import systemctl_mqtt._dbus.service_manager
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._mqtt
 
@@ -54,13 +55,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class _State:
-    def __init__(
+    # pylint: disable=too-many-instance-attributes
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         mqtt_topic_prefix: str,
         homeassistant_discovery_prefix: str,
         homeassistant_discovery_object_id: str,
         poweroff_delay: datetime.timedelta,
+        monitored_system_unit_names: typing.List[str],
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
@@ -71,6 +74,7 @@ class _State:
         self._shutdown_lock: typing.Optional[jeepney.fds.FileDescriptor] = None
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
+        self._monitored_system_unit_names = monitored_system_unit_names
 
     @property
     def mqtt_topic_prefix(self) -> str:
@@ -83,6 +87,13 @@ class _State:
         # > _MQTT_AVAILABILITY_TOPIC = "switchbot-mqtt/status"
         # https://github.com/fphammerle/switchbot-mqtt/blob/v3.3.1/switchbot_mqtt/__init__.py#L30
         return self._mqtt_topic_prefix + "/status"
+
+    def get_system_unit_active_state_mqtt_topic(self, *, unit_name: str) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/active-state"
+
+    @property
+    def monitored_system_unit_names(self) -> typing.List[str]:
+        return self._monitored_system_unit_names
 
     @property
     def shutdown_lock_acquired(self) -> bool:
@@ -201,6 +212,16 @@ class _State:
                 "platform": "button",
                 "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
             }
+        for unit_name in self._monitored_system_unit_names:
+            config["components"]["unit/system/" + unit_name + "/active-state"] = {  # type: ignore
+                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-active-state",
+                "object_id": f"{hostname}_unit_system_{unit_name}_active_state",
+                "name": f"{unit_name} active state",
+                "platform": "sensor",
+                "state_topic": self.get_system_unit_active_state_mqtt_topic(
+                    unit_name=unit_name
+                ),
+            }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         await mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
@@ -263,27 +284,124 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
             action_by_topic[message.topic.value].trigger(state=state)
 
 
+async def _dbus_signal_loop_preparing_for_shutdown(
+    *,
+    state: _State,
+    mqtt_client: aiomqtt.Client,
+    dbus_router: jeepney.io.asyncio.DBusRouter,
+    bus_proxy: jeepney.io.asyncio.Proxy,
+) -> None:
+    preparing_for_shutdown_match_rule = (
+        # pylint: disable=protected-access
+        systemctl_mqtt._dbus.login_manager.get_login_manager_signal_match_rule(
+            "PrepareForShutdown"
+        )
+    )
+    assert await bus_proxy.AddMatch(preparing_for_shutdown_match_rule) == ()
+    with dbus_router.filter(preparing_for_shutdown_match_rule) as queue:
+        while True:
+            message: jeepney.low_level.Message = await queue.get()
+            (preparing_for_shutdown,) = message.body
+            await state.preparing_for_shutdown_handler(
+                active=preparing_for_shutdown, mqtt_client=mqtt_client
+            )
+            queue.task_done()
+
+
+async def _get_unit_path(
+    *, service_manager: jeepney.io.asyncio.Proxy, unit_name: str
+) -> str:
+    (path,) = await service_manager.GetUnit(name=unit_name)
+    return path
+
+
+async def _dbus_signal_loop_unit(  # pylint: disable=too-many-arguments
+    *,
+    state: _State,
+    mqtt_client: aiomqtt.Client,
+    dbus_router: jeepney.io.asyncio.DBusRouter,
+    bus_proxy: jeepney.io.asyncio.Proxy,
+    unit_name: str,
+    unit_path: str,
+) -> None:
+    unit_proxy = jeepney.io.asyncio.Proxy(
+        # pylint: disable=protected-access
+        msggen=systemctl_mqtt._dbus.service_manager.Unit(object_path=unit_path),
+        router=dbus_router,
+    )
+    unit_properties_changed_match_rule = jeepney.MatchRule(
+        type="signal",
+        interface="org.freedesktop.DBus.Properties",
+        member="PropertiesChanged",
+        path=unit_path,
+    )
+    assert (await bus_proxy.AddMatch(unit_properties_changed_match_rule)) == ()
+    # > Table 1. Unit ACTIVE states …
+    # > active	Started, bound, plugged in, …
+    # > inactive	Stopped, unbound, unplugged, …
+    # > failed	… process returned error code on exit, crashed, an operation
+    # .         timed out, or after too many restarts).
+    # > activating	Changing from inactive to active.
+    # > deactivating	Changing from active to inactive.
+    # > maintenance	Unit is inactive and … maintenance … in progress.
+    # > reloading	Unit is active and it is reloading its configuration.
+    # > refreshing	Unit is active and a new mount is being activated in its
+    # .             namespace.
+    # https://web.archive.org/web/20250101121304/https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
+    active_state_topic = state.get_system_unit_active_state_mqtt_topic(
+        unit_name=unit_name
+    )
+    ((_, last_active_state),) = await unit_proxy.Get(property_name="ActiveState")
+    await mqtt_client.publish(topic=active_state_topic, payload=last_active_state)
+    with dbus_router.filter(unit_properties_changed_match_rule) as queue:
+        while True:
+            await queue.get()
+            ((_, current_active_state),) = await unit_proxy.Get(
+                property_name="ActiveState"
+            )
+            if current_active_state != last_active_state:
+                await mqtt_client.publish(
+                    topic=active_state_topic, payload=current_active_state
+                )
+                last_active_state = current_active_state
+            queue.task_done()
+
+
 async def _dbus_signal_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
     async with jeepney.io.asyncio.open_dbus_router(bus="SYSTEM") as router:
         # router: jeepney.io.asyncio.DBusRouter
         bus_proxy = jeepney.io.asyncio.Proxy(
             msggen=jeepney.bus_messages.message_bus, router=router
         )
-        preparing_for_shutdown_match_rule = (
+        system_service_manager = jeepney.io.asyncio.Proxy(
             # pylint: disable=protected-access
-            systemctl_mqtt._dbus.login_manager.get_login_manager_signal_match_rule(
-                "PrepareForShutdown"
-            )
+            msggen=systemctl_mqtt._dbus.service_manager.ServiceManager(),
+            router=router,
         )
-        assert await bus_proxy.AddMatch(preparing_for_shutdown_match_rule) == ()
-        with router.filter(preparing_for_shutdown_match_rule) as queue:
-            while True:
-                message: jeepney.low_level.Message = await queue.get()
-                (preparing_for_shutdown,) = message.body
-                await state.preparing_for_shutdown_handler(
-                    active=preparing_for_shutdown, mqtt_client=mqtt_client
+        await asyncio.gather(
+            *[
+                _dbus_signal_loop_preparing_for_shutdown(
+                    state=state,
+                    mqtt_client=mqtt_client,
+                    dbus_router=router,
+                    bus_proxy=bus_proxy,
                 )
-                queue.task_done()
+            ]
+            + [
+                _dbus_signal_loop_unit(
+                    state=state,
+                    mqtt_client=mqtt_client,
+                    dbus_router=router,
+                    bus_proxy=bus_proxy,
+                    unit_name=unit_name,
+                    unit_path=await _get_unit_path(
+                        service_manager=system_service_manager, unit_name=unit_name
+                    ),
+                )
+                for unit_name in state.monitored_system_unit_names
+            ],
+            return_exceptions=False,
+        )
 
 
 async def _run(  # pylint: disable=too-many-arguments
@@ -296,6 +414,7 @@ async def _run(  # pylint: disable=too-many-arguments
     homeassistant_discovery_prefix: str,
     homeassistant_discovery_object_id: str,
     poweroff_delay: datetime.timedelta,
+    monitored_system_unit_names: typing.List[str],
     mqtt_disable_tls: bool = False,
 ) -> None:
     state = _State(
@@ -303,6 +422,7 @@ async def _run(  # pylint: disable=too-many-arguments
         homeassistant_discovery_prefix=homeassistant_discovery_prefix,
         homeassistant_discovery_object_id=homeassistant_discovery_object_id,
         poweroff_delay=poweroff_delay,
+        monitored_system_unit_names=monitored_system_unit_names,
     )
     _LOGGER.info(
         "connecting to MQTT broker %s:%d (TLS %s)",
@@ -409,6 +529,14 @@ def _main() -> None:
     argparser.add_argument(
         "--poweroff-delay-seconds", type=float, default=4.0, help="default: %(default)s"
     )
+    argparser.add_argument(
+        "--monitor-system-unit",
+        type=str,
+        metavar="UNIT_NAME",
+        dest="monitored_system_unit_names",
+        action="append",
+        help="e.g. --monitor-system-unit ssh.service --monitor-system-unit custom.service",
+    )
     args = argparser.parse_args()
     logging.root.setLevel(_ARGUMENT_LOG_LEVEL_MAPPING[args.log_level])
     if args.mqtt_port:
@@ -449,5 +577,6 @@ def _main() -> None:
             homeassistant_discovery_prefix=args.homeassistant_discovery_prefix,
             homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
+            monitored_system_unit_names=args.monitored_system_unit_names or [],
         )
     )

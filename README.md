@@ -51,6 +51,15 @@ $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/lock-all-sessions -n
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/suspend -n
 ```
 
+### Monitor `ActiveState` of System Units
+
+```
+$ mosquitto_pub --monitor-system-unit foo.service \
+    --monitor-system-unit bar.service …
+```
+enables reports on topic
+`systemctl/[hostname]/unit/system/[unit_name]/active-state`.
+
 ## Home Assistant 🏡
 
 ### Automatic Discovery

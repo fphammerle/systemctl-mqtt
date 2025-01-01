@@ -40,6 +40,7 @@ def test_shutdown_lock():
             homeassistant_discovery_prefix=None,
             homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=[],
         )
         get_login_manager_mock.return_value.Inhibit.return_value = (lock_fd,)
         state.acquire_shutdown_lock()
@@ -66,6 +67,7 @@ async def test_preparing_for_shutdown_handler(active: bool) -> None:
             homeassistant_discovery_prefix="pre/fix",
             homeassistant_discovery_object_id="obj",
             poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=[],
         )
     mqtt_client_mock = unittest.mock.MagicMock()
     with unittest.mock.patch.object(
@@ -101,6 +103,7 @@ async def test_publish_preparing_for_shutdown(active: bool) -> None:
             homeassistant_discovery_prefix="pre/fix",
             homeassistant_discovery_object_id="obj",
             poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=[],
         )
     assert state._login_manager == login_manager_mock
     mqtt_client_mock = unittest.mock.AsyncMock()
@@ -133,6 +136,7 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
             homeassistant_discovery_prefix=None,
             homeassistant_discovery_object_id=None,
             poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=[],
         )
     mqtt_client_mock = unittest.mock.MagicMock()
     await state.publish_preparing_for_shutdown(mqtt_client=None)
@@ -150,16 +154,25 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
 @pytest.mark.parametrize("discovery_prefix", ["homeassistant", "home/assistant"])
 @pytest.mark.parametrize("object_id", ["raspberrypi", "debian21"])
 @pytest.mark.parametrize("hostname", ["hostname", "host-name"])
+@pytest.mark.parametrize(
+    "monitored_system_unit_names", [[], ["foo.service", "bar.service"]]
+)
 async def test_publish_homeassistant_device_config(
-    topic_prefix, discovery_prefix, object_id, hostname
-):
+    topic_prefix: str,
+    discovery_prefix: str,
+    object_id: str,
+    hostname: str,
+    monitored_system_unit_names: typing.List[str],
+) -> None:
     with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection"):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix=topic_prefix,
             homeassistant_discovery_prefix=discovery_prefix,
             homeassistant_discovery_object_id=object_id,
             poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=monitored_system_unit_names,
         )
+    assert state.monitored_system_unit_names == monitored_system_unit_names
     mqtt_client = unittest.mock.AsyncMock()
     with unittest.mock.patch(
         "systemctl_mqtt._utils.get_hostname", return_value=hostname
@@ -212,5 +225,15 @@ async def test_publish_homeassistant_device_config(
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/suspend",
             },
+        }
+        | {
+            f"unit/system/{n}/active-state": {
+                "unique_id": f"systemctl-mqtt-{hostname}-unit-system-{n}-active-state",
+                "object_id": f"{hostname}_unit_system_{n}_active_state",
+                "name": f"{n} active state",
+                "platform": "sensor",
+                "state_topic": f"{topic_prefix}/unit/system/{n}/active-state",
+            }
+            for n in monitored_system_unit_names
         },
     }
