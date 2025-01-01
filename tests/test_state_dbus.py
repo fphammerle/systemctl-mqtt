@@ -33,7 +33,7 @@ import systemctl_mqtt
 def test_shutdown_lock():
     lock_fd = unittest.mock.MagicMock(spec=jeepney.fds.FileDescriptor)
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy"
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy"
     ) as get_login_manager_mock:
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
@@ -58,7 +58,9 @@ def test_shutdown_lock():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("active", [True, False])
 async def test_preparing_for_shutdown_handler(active: bool) -> None:
-    with unittest.mock.patch("systemctl_mqtt._dbus.get_login_manager_proxy"):
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy"
+    ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
             homeassistant_discovery_prefix="pre/fix",
@@ -91,7 +93,8 @@ async def test_publish_preparing_for_shutdown(active: bool) -> None:
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.return_value = (("b", active),)[:]
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",
@@ -122,7 +125,8 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.Get.side_effect = DBusErrorResponseMock("error", ("mocked",))
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         state = systemctl_mqtt._State(
             mqtt_topic_prefix="any",

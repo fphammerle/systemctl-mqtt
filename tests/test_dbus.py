@@ -26,13 +26,13 @@ import jeepney.low_level
 import jeepney.wrappers
 import pytest
 
-import systemctl_mqtt._dbus
+import systemctl_mqtt._dbus.login_manager
 
 # pylint: disable=protected-access
 
 
 def test_get_login_manager_proxy():
-    login_manager = systemctl_mqtt._dbus.get_login_manager_proxy()
+    login_manager = systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()
     assert isinstance(login_manager, jeepney.io.blocking.Proxy)
     assert login_manager._msggen.interface == "org.freedesktop.login1.Manager"
     # https://freedesktop.org/wiki/Software/systemd/logind/
@@ -55,7 +55,7 @@ def test__log_shutdown_inhibitors_some(caplog):
         ],
     )
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus.login_manager._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 2
     assert caplog.records[0].levelno == logging.DEBUG
     assert (
@@ -69,7 +69,7 @@ def test__log_shutdown_inhibitors_none(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.return_value = ([],)
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus.login_manager._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.DEBUG
     assert caplog.records[0].message == "no shutdown inhibitor locks found"
@@ -79,7 +79,7 @@ def test__log_shutdown_inhibitors_fail(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.side_effect = DBusErrorResponseMock("error", "mocked")
     with caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._dbus._log_shutdown_inhibitors(login_manager)
+        systemctl_mqtt._dbus.login_manager._log_shutdown_inhibitors(login_manager)
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.WARNING
     assert (
@@ -93,10 +93,11 @@ def test__log_shutdown_inhibitors_fail(caplog):
 def test__schedule_shutdown(action, delay):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         login_manager_mock.ListInhibitors.return_value = ([],)
-        systemctl_mqtt._dbus.schedule_shutdown(action=action, delay=delay)
+        systemctl_mqtt._dbus.login_manager.schedule_shutdown(action=action, delay=delay)
     login_manager_mock.ScheduleShutdown.assert_called_once()
     schedule_args, schedule_kwargs = login_manager_mock.ScheduleShutdown.call_args
     assert not schedule_args
@@ -139,9 +140,10 @@ def test__schedule_shutdown_fail(
     )
     login_manager_mock.ListInhibitors.return_value = ([],)
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ), caplog.at_level(logging.DEBUG):
-        systemctl_mqtt._dbus.schedule_shutdown(
+        systemctl_mqtt._dbus.login_manager.schedule_shutdown(
             action=action, delay=datetime.timedelta(seconds=21)
         )
     login_manager_mock.ScheduleShutdown.assert_called_once()
@@ -156,9 +158,10 @@ def test__schedule_shutdown_fail(
 def test_suspend(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ), caplog.at_level(logging.INFO):
-        systemctl_mqtt._dbus.suspend()
+        systemctl_mqtt._dbus.login_manager.suspend()
     login_manager_mock.Suspend.assert_called_once_with(interactive=False)
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.INFO
@@ -168,9 +171,10 @@ def test_suspend(caplog):
 def test_lock_all_sessions(caplog):
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ), caplog.at_level(logging.INFO):
-        systemctl_mqtt._dbus.lock_all_sessions()
+        systemctl_mqtt._dbus.login_manager.lock_all_sessions()
     login_manager_mock.LockSessions.assert_called_once_with()
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.INFO

@@ -14,9 +14,9 @@ import systemctl_mqtt
 def test_poweroff_trigger(delay):
     action = systemctl_mqtt._MQTTActionSchedulePoweroff()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy"
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy"
     ), unittest.mock.patch(
-        "systemctl_mqtt._dbus.schedule_shutdown"
+        "systemctl_mqtt._dbus.login_manager.schedule_shutdown"
     ) as schedule_shutdown_mock:
         action.trigger(
             state=systemctl_mqtt._State(
@@ -36,7 +36,8 @@ def test_mqtt_topic_suffix_action_mapping_poweroff(topic_suffix, expected_action
     mqtt_action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING[topic_suffix]
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         mqtt_action.trigger(
             state=systemctl_mqtt._State(
@@ -60,7 +61,8 @@ def test_mqtt_topic_suffix_action_mapping_lock():
     mqtt_action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["lock-all-sessions"]
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         mqtt_action.trigger(state="dummy")
     login_manager_mock.LockSessions.assert_called_once_with()
@@ -70,7 +72,8 @@ def test_mqtt_topic_suffix_action_mapping_suspend():
     mqtt_action = systemctl_mqtt._MQTT_TOPIC_SUFFIX_ACTION_MAPPING["suspend"]
     login_manager_mock = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ):
         mqtt_action.trigger(state="dummy")
     login_manager_mock.Suspend.assert_called_once_with(interactive=False)

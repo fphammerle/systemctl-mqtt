@@ -23,7 +23,7 @@ import unittest.mock
 import pytest
 from jeepney.low_level import HeaderFields, Message
 
-import systemctl_mqtt._dbus
+import systemctl_mqtt._dbus.login_manager
 
 # pylint: disable=protected-access
 
@@ -67,7 +67,7 @@ def test_method(
     body: typing.Tuple[typing.Any],
 ) -> None:
     with mock_open_dbus_connection() as dbus_connection_mock:
-        proxy = systemctl_mqtt._dbus.get_login_manager_proxy()
+        proxy = systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()
     getattr(proxy, member)(**kwargs)
     dbus_connection_mock.send_and_get_reply.assert_called_once()
     message: Message = dbus_connection_mock.send_and_get_reply.call_args[0][0]
@@ -85,7 +85,7 @@ def test_method(
 @pytest.mark.parametrize("property_name", ["HandlePowerKey", "Docked"])
 def test_get(property_name: str) -> None:
     with mock_open_dbus_connection() as dbus_connection_mock:
-        proxy = systemctl_mqtt._dbus.get_login_manager_proxy()
+        proxy = systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()
     proxy.Get(property_name=property_name)
     dbus_connection_mock.send_and_get_reply.assert_called_once()
     message: Message = dbus_connection_mock.send_and_get_reply.call_args[0][0]

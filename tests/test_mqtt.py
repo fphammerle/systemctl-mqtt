@@ -50,7 +50,8 @@ async def test__run(
     with unittest.mock.patch(
         "aiomqtt.Client", autospec=False
     ) as mqtt_client_class_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ), unittest.mock.patch(
         "systemctl_mqtt._dbus_signal_loop"
     ) as dbus_signal_loop_mock:
@@ -254,7 +255,7 @@ async def test__run_authentication_missing_username(
     mqtt_host: str, mqtt_port: int, mqtt_password: str
 ) -> None:
     with unittest.mock.patch("aiomqtt.Client"), unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy"
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy"
     ), unittest.mock.patch("systemctl_mqtt._dbus_signal_loop") as dbus_signal_loop_mock:
         with pytest.raises(ValueError, match=r"^Missing MQTT username$"):
             await systemctl_mqtt._run(
@@ -277,7 +278,8 @@ async def test__run_sigint(mqtt_topic_prefix: str):
     with unittest.mock.patch(
         "aiomqtt.Client", autospec=False
     ) as mqtt_client_class_mock, unittest.mock.patch(
-        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
     ), unittest.mock.patch(
         "asyncio.gather", side_effect=KeyboardInterrupt
     ):
@@ -338,7 +340,7 @@ async def test__mqtt_message_loop_trigger_poweroff(
         )
     ]
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.schedule_shutdown"
+        "systemctl_mqtt._dbus.login_manager.schedule_shutdown"
     ) as schedule_shutdown_mock, caplog.at_level(logging.DEBUG):
         await systemctl_mqtt._mqtt_message_loop(
             state=state, mqtt_client=mqtt_client_mock
@@ -385,7 +387,7 @@ async def test__mqtt_message_loop_retained(
         )
     ]
     with unittest.mock.patch(
-        "systemctl_mqtt._dbus.schedule_shutdown"
+        "systemctl_mqtt._dbus.login_manager.schedule_shutdown"
     ) as schedule_shutdown_mock, caplog.at_level(logging.DEBUG):
         await systemctl_mqtt._mqtt_message_loop(
             state=state, mqtt_client=mqtt_client_mock

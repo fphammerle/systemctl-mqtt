@@ -35,7 +35,7 @@ import jeepney
 import jeepney.bus_messages
 import jeepney.io.asyncio
 
-import systemctl_mqtt._dbus
+import systemctl_mqtt._dbus.login_manager
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._mqtt
 
@@ -65,7 +65,9 @@ class _State:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
         self._homeassistant_discovery_object_id = homeassistant_discovery_object_id
-        self._login_manager = systemctl_mqtt._dbus.get_login_manager_proxy()
+        self._login_manager = (
+            systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()
+        )
         self._shutdown_lock: typing.Optional[jeepney.fds.FileDescriptor] = None
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
@@ -218,7 +220,7 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
-        systemctl_mqtt._dbus.schedule_shutdown(
+        systemctl_mqtt._dbus.login_manager.schedule_shutdown(
             action="poweroff", delay=state.poweroff_delay
         )
 
@@ -227,14 +229,14 @@ class _MQTTActionLockAllSessions(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
-        systemctl_mqtt._dbus.lock_all_sessions()
+        systemctl_mqtt._dbus.login_manager.lock_all_sessions()
 
 
 class _MQTTActionSuspend(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
         # pylint: disable=protected-access
-        systemctl_mqtt._dbus.suspend()
+        systemctl_mqtt._dbus.login_manager.suspend()
 
 
 _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
@@ -269,7 +271,7 @@ async def _dbus_signal_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> No
         )
         preparing_for_shutdown_match_rule = (
             # pylint: disable=protected-access
-            systemctl_mqtt._dbus.get_login_manager_signal_match_rule(
+            systemctl_mqtt._dbus.login_manager.get_login_manager_signal_match_rule(
                 "PrepareForShutdown"
             )
         )
