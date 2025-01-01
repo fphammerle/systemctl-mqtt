@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - suspend when receiving message on topic `systemctl/[hostname]/suspend`
   (https://github.com/fphammerle/systemctl-mqtt/issues/97)
+- birth & last will message on topic `systemctl/[hostname]/status`
+  ("online" / "offline", https://github.com/fphammerle/systemctl-mqtt/issues/38)
 - automatic discovery in home assistant:
+  - availability status
   - entity `button.[hostname]_logind_lock_all_sessions`
   - entity `button.[hostname]_logind_poweroff`
   - entity `button.[hostname]_logind_suspend`

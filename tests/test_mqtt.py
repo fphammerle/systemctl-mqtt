@@ -77,6 +77,13 @@ async def test__run(
     assert isinstance(mqtt_client_init_kwargs.pop("tls_context"), ssl.SSLContext)
     assert mqtt_client_init_kwargs.pop("username") is None
     assert mqtt_client_init_kwargs.pop("password") is None
+    assert mqtt_client_init_kwargs.pop("will") == aiomqtt.Will(
+        topic=mqtt_topic_prefix + "/status",
+        payload="offline",
+        qos=0,
+        retain=True,
+        properties=None,
+    )
     assert not mqtt_client_init_kwargs
     login_manager_mock.Inhibit.assert_called_once_with(
         what="shutdown",
@@ -87,7 +94,7 @@ async def test__run(
     login_manager_mock.Get.assert_called_once_with("PreparingForShutdown")
     async with mqtt_client_class_mock() as mqtt_client_mock:
         pass
-    assert mqtt_client_mock.publish.call_count == 2
+    assert mqtt_client_mock.publish.call_count == 4
     assert (
         mqtt_client_mock.publish.call_args_list[0][1]["topic"]
         == f"{homeassistant_discovery_prefix}/device/{homeassistant_discovery_object_id}/config"
@@ -97,6 +104,16 @@ async def test__run(
         payload="false",
         retain=False,
     )
+    assert mqtt_client_mock.publish.call_args_list[2][1] == {
+        "topic": mqtt_topic_prefix + "/status",
+        "payload": "online",
+        "retain": True,
+    }
+    assert mqtt_client_mock.publish.call_args_list[3][1] == {
+        "topic": mqtt_topic_prefix + "/status",
+        "payload": "offline",
+        "retain": True,
+    }
     assert sorted(mqtt_client_mock.subscribe.call_args_list) == [
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
@@ -160,9 +177,7 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
         assert mqtt_client_init_kwargs.pop("tls_context") is None
     else:
         assert isinstance(mqtt_client_init_kwargs.pop("tls_context"), ssl.SSLContext)
-    assert mqtt_client_init_kwargs.pop("username") is None
-    assert mqtt_client_init_kwargs.pop("password") is None
-    assert not mqtt_client_init_kwargs
+    assert set(mqtt_client_init_kwargs.keys()) == {"username", "password", "will"}
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
         f"connecting to MQTT broker {mqtt_host}:{mqtt_port}"
@@ -256,6 +271,51 @@ async def test__run_authentication_missing_username(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
+async def test__run_sigint(mqtt_topic_prefix: str):
+    login_manager_mock = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "aiomqtt.Client", autospec=False
+    ) as mqtt_client_class_mock, unittest.mock.patch(
+        "systemctl_mqtt._dbus.get_login_manager_proxy", return_value=login_manager_mock
+    ), unittest.mock.patch(
+        "asyncio.gather", side_effect=KeyboardInterrupt
+    ):
+        login_manager_mock.Inhibit.return_value = (jeepney.fds.FileDescriptor(-1),)
+        login_manager_mock.Get.return_value = (("b", False),)
+        with pytest.raises(KeyboardInterrupt):
+            await systemctl_mqtt._run(
+                mqtt_host="mqtt-broker.local",
+                mqtt_port=1883,
+                mqtt_username=None,
+                mqtt_password=None,
+                mqtt_topic_prefix=mqtt_topic_prefix,
+                homeassistant_discovery_prefix="homeassistant",
+                homeassistant_discovery_object_id="host",
+                poweroff_delay=datetime.timedelta(),
+            )
+    async with mqtt_client_class_mock() as mqtt_client_mock:
+        pass
+    assert mqtt_client_mock.publish.call_count == 4
+    assert mqtt_client_mock.publish.call_args_list[0][1]["topic"].endswith("/config")
+    assert mqtt_client_mock.publish.call_args_list[1][1]["topic"].endswith(
+        "/preparing-for-shutdown"
+    )
+    assert mqtt_client_mock.publish.call_args_list[2][1] == {
+        "topic": mqtt_topic_prefix + "/status",
+        "payload": "online",
+        "retain": True,
+    }
+    assert mqtt_client_mock.publish.call_args_list[3][1] == {
+        "topic": mqtt_topic_prefix + "/status",
+        "payload": "offline",
+        "retain": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine '_dbus_signal_loop' was never awaited")
+@pytest.mark.filterwarnings("ignore:coroutine '_mqtt_message_loop' was never awaited")
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
 async def test__mqtt_message_loop_trigger_poweroff(
     caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str

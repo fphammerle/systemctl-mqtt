@@ -176,6 +176,7 @@ async def test_publish_homeassistant_device_config(
             "support_url": "https://github.com/fphammerle/systemctl-mqtt",
         },
         "device": {"identifiers": [hostname], "name": hostname},
+        "availability": {"topic": topic_prefix + "/status"},
         "components": {
             "logind/preparing-for-shutdown": {
                 "unique_id": f"systemctl-mqtt-{hostname}-logind-preparing-for-shutdown",

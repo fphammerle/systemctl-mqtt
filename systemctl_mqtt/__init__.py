@@ -41,6 +41,10 @@ import systemctl_mqtt._mqtt
 
 _MQTT_DEFAULT_PORT = 1883
 _MQTT_DEFAULT_TLS_PORT = 8883
+# > payload_not_available string (Optional, default: offline)
+# https://web.archive.org/web/20250101075341/https://www.home-assistant.io/integrations/sensor.mqtt/#payload_not_available
+_MQTT_PAYLOAD_NOT_AVAILABLE = "offline"
+_MQTT_PAYLOAD_AVAILABLE = "online"
 _ARGUMENT_LOG_LEVEL_MAPPING = {
     a: getattr(logging, a.upper())
     for a in ("debug", "info", "warning", "error", "critical")
@@ -69,6 +73,14 @@ class _State:
     @property
     def mqtt_topic_prefix(self) -> str:
         return self._mqtt_topic_prefix
+
+    @property
+    def mqtt_availability_topic(self) -> str:
+        # > mqtt.ATTR_TOPIC: "homeassistant/status",
+        # https://github.com/home-assistant/core/blob/2024.12.5/tests/components/mqtt/conftest.py#L23
+        # > _MQTT_AVAILABILITY_TOPIC = "switchbot-mqtt/status"
+        # https://github.com/fphammerle/switchbot-mqtt/blob/v3.3.1/switchbot_mqtt/__init__.py#L30
+        return self._mqtt_topic_prefix + "/status"
 
     @property
     def shutdown_lock_acquired(self) -> bool:
@@ -161,6 +173,7 @@ class _State:
                 "sw_version": package_metadata["Version"],
                 "support_url": package_metadata["Home-page"],
             },
+            "availability": {"topic": self.mqtt_availability_topic},
             "components": {
                 "logind/preparing-for-shutdown": {
                     "unique_id": unique_id_prefix + "-logind-preparing-for-shutdown",
@@ -306,18 +319,36 @@ async def _run(  # pylint: disable=too-many-arguments
         tls_context=None if mqtt_disable_tls else ssl.create_default_context(),
         username=None if mqtt_username is None else mqtt_username,
         password=None if mqtt_password is None else mqtt_password,
+        will=aiomqtt.Will(  # e.g. on SIGTERM & SIGKILL
+            topic=state.mqtt_availability_topic,
+            payload=_MQTT_PAYLOAD_NOT_AVAILABLE,
+            retain=True,
+        ),
     ) as mqtt_client:
         _LOGGER.debug("connected to MQTT broker %s:%d", mqtt_host, mqtt_port)
         if not state.shutdown_lock_acquired:
             state.acquire_shutdown_lock()
         await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
         await state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
-        # asyncio.TaskGroup added in python3.11
-        await asyncio.gather(
-            _mqtt_message_loop(state=state, mqtt_client=mqtt_client),
-            _dbus_signal_loop(state=state, mqtt_client=mqtt_client),
-            return_exceptions=False,
-        )
+        try:
+            await mqtt_client.publish(
+                topic=state.mqtt_availability_topic,
+                payload=_MQTT_PAYLOAD_AVAILABLE,
+                retain=True,
+            )
+            # asynpio.TaskGroup added in python3.11
+            await asyncio.gather(
+                _mqtt_message_loop(state=state, mqtt_client=mqtt_client),
+                _dbus_signal_loop(state=state, mqtt_client=mqtt_client),
+                return_exceptions=False,
+            )
+        finally:  # e.g. on SIGINT
+            # https://web.archive.org/web/20250101080719/https://github.com/empicano/aiomqtt/issues/28
+            await mqtt_client.publish(
+                topic=state.mqtt_availability_topic,
+                payload=_MQTT_PAYLOAD_NOT_AVAILABLE,
+                retain=True,
+            )
 
 
 def _main() -> None:
