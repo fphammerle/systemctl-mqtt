@@ -31,6 +31,7 @@ services:
       --mqtt-disable-tls
     #  --mqtt-username raspberrypi
     #  --mqtt-password-file /etc/systemctl-mqtt/mqtt-password
+    #  --monitor-system-unit ssh.service
     hostname: raspberrypi
     userns_mode: host
     # prefering explicit user specification over "USER 0" in Dockerfile
