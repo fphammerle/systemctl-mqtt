@@ -16,24 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - declare compatibility with `python3.11`, `python3.12` & `python3.13`
 
 ### Changed
-- migrate from [dbus-python](https://gitlab.freedesktop.org/dbus/dbus-python/)
+- disable `retain` flag on topic `systemctl/[hostname]/preparing-for-shutdown`
+- migrated from [dbus-python](https://gitlab.freedesktop.org/dbus/dbus-python/)
   to pure-python [jeepney](https://gitlab.com/takluyver/jeepney)
   (removes indirect dependency on libdbus, glib,
   [PyGObject](https://gitlab.gnome.org/GNOME/pygobject) and
   [pycairo](https://github.com/pygobject/pycairo),
   fixes https://github.com/fphammerle/systemctl-mqtt/issues/39)
+- migrate from [paho-mqtt](https://github.com/eclipse/paho.mqtt.python) to its
+  async wrapper [aiomqtt](https://github.com/sbtinstruments/aiomqtt)
 - automatic discovery in home assistant:
-  - replace component-based (topic:
+  - replaced component-based (topic:
     `<discovery_prefix>/binary_sensor/<node_id>/preparing-for-shutdown/config`)
     with device-based discovery (`<discovery_prefix>/device/<object_id>/config`)
-  - replace command-line option `--homeassistant-node-id` with
+  - replaced command-line option `--homeassistant-node-id` with
     `--homeassistant-discovery-object-id`
-  - rename entity `binary_sensor.[hostname]_preparing_for_shutdown` to
+  - renamed entity `binary_sensor.[hostname]_preparing_for_shutdown` to
     `binary_sensor.[hostname]_logind_preparing_for_shutdown`
-  - disable "retain" flag for discovery messages
+  - disabled "retain" flag for discovery messages
     (to avoid reappearing ghost devices)
 - container image / dockerfile:
-  - upgrade alpine base image from 3.13.1 to 3.21.0 including upgrade of python
+  - upgraded alpine base image from 3.13.1 to 3.21.0 including upgrade of python
     from 3.8 to 3.12
   - support build without git history by manually setting build argument
     `SETUPTOOLS_SCM_PRETEND_VERSION`
@@ -45,8 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - container image / dockerfile:
   - split `pipenv install` into two stages to speed up image builds
   - `chmod` files copied from host to no longer require `o=rX` perms on host
-  - add registry to base image specifier for `podman build`
-  - add `--force` flag to `rm` invocation to avoid interactive questions while
+  - added registry to base image specifier for `podman build`
+  - added `--force` flag to `rm` invocation to avoid interactive questions while
     running `podman build`
 
 ### Removed

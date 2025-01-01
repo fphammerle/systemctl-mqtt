@@ -74,3 +74,10 @@ def test_mqtt_topic_suffix_action_mapping_suspend():
     ):
         mqtt_action.trigger(state="dummy")
     login_manager_mock.Suspend.assert_called_once_with(interactive=False)
+
+
+def test_poweroff_str():
+    assert (
+        str(systemctl_mqtt._MQTTActionSchedulePoweroff())
+        == "_MQTTActionSchedulePoweroff"
+    )

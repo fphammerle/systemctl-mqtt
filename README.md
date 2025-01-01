@@ -16,7 +16,7 @@ $ pip3 install --user --upgrade systemctl-mqtt
 $ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
 ```
 
-On debian-based systems, dependencies can optionally be installed via:
+On debian-based systems, a subset of dependencies can optionally be installed via:
 ```sh
 $ sudo apt-get install --no-install-recommends python3-jeepney python3-paho-mqtt
 ```
