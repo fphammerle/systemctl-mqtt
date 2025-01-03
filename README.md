@@ -71,6 +71,8 @@ added automatically:
 - `button.[hostname]_logind_lock_all_sessions`
 - `button.[hostname]_logind_poweroff`
 - `button.[hostname]_logind_suspend`
+- `sensor.[hostname]_unit_system_[unit_name]_active_state`
+  for `--monitor-system-unit [unit_name]`
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
 
