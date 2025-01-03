@@ -17,6 +17,7 @@
 
 import asyncio
 import datetime
+import getpass
 import logging
 import typing
 import unittest.mock
@@ -126,7 +127,17 @@ class DBusErrorResponseMock(jeepney.wrappers.DBusErrorResponse):
         (
             "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired",
             "Interactive authentication required.",
-            "unauthorized; missing polkit authorization rules?",
+            """interactive authorization required
+
+create /etc/polkit-1/rules.d/50-systemctl-mqtt.rules and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === "org.freedesktop.login1.power-off" && subject.user === "{{username}}") {
+        return polkit.Result.YES;
+    }
+});
+""".replace(
+                "{{username}}", getpass.getuser()
+            ),
         ),
     ],
 )
@@ -153,6 +164,51 @@ def test__schedule_shutdown_fail(
     assert caplog.records[1].levelno == logging.ERROR
     assert caplog.records[1].message == f"failed to schedule {action}: {log_message}"
     assert "inhibitor" in caplog.records[2].message
+
+
+@pytest.mark.parametrize("action", ["poweroff"])
+@pytest.mark.parametrize(
+    ("error_name", "error_message", "log_message"),
+    [
+        (
+            "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired",
+            "Interactive authentication required.",
+            """interactive authorization required
+
+create /etc/polkit-1/rules.d/50-systemctl-mqtt.rules and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === "org.freedesktop.login1.power-off" && subject.user === "USERNAME") {
+        return polkit.Result.YES;
+    }
+});
+""",
+        ),
+    ],
+)
+def test__schedule_shutdown_fail_no_username(
+    caplog, action, error_name, error_message, log_message
+):
+    login_manager_mock = unittest.mock.MagicMock()
+    login_manager_mock.ScheduleShutdown.side_effect = DBusErrorResponseMock(
+        name=error_name,
+        data=(error_message,),
+    )
+    login_manager_mock.ListInhibitors.return_value = ([],)
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
+    ), unittest.mock.patch(
+        "getpass.getuser", side_effect=OSError("No username set in the environment")
+    ), caplog.at_level(
+        logging.ERROR
+    ):
+        systemctl_mqtt._dbus.login_manager.schedule_shutdown(
+            action=action, delay=datetime.timedelta(seconds=21)
+        )
+    login_manager_mock.ScheduleShutdown.assert_called_once()
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert caplog.records[0].message == f"failed to schedule {action}: {log_message}"
 
 
 def test_suspend(caplog):

@@ -16,7 +16,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import datetime
+import getpass
+import json
 import logging
+import typing
 
 import jeepney
 import jeepney.io.blocking
@@ -27,6 +30,22 @@ _LOGGER = logging.getLogger(__name__)
 
 _LOGIN_MANAGER_OBJECT_PATH = "/org/freedesktop/login1"
 _LOGIN_MANAGER_INTERFACE = "org.freedesktop.login1.Manager"
+
+
+def _get_username() -> typing.Optional[str]:
+    try:
+        return getpass.getuser()
+    except OSError:
+        # > Traceback (most recent call last):
+        # >   File "/usr/local/lib/python3.13/getpass.py", line 173, in getuser
+        # >     return pwd.getpwuid(os.getuid())[0]
+        # >            ~~~~~~~~~~~~^^^^^^^^^^^^^
+        # > KeyError: 'getpwuid(): uid not found: 100'
+        #
+        # > The above exception was the direct cause of the following exception:
+        # > …
+        # > OSError: No username set in the environment
+        return None
 
 
 def get_login_manager_signal_match_rule(member: str) -> jeepney.MatchRule:
@@ -158,8 +177,20 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
             and exc.data == ("Interactive authentication required.",)
         ):
             _LOGGER.error(
-                "failed to schedule %s: unauthorized; missing polkit authorization rules?",
+                """failed to schedule %s: interactive authorization required
+
+create %s and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === %s && subject.user === %s) {
+        return polkit.Result.YES;
+    }
+});
+""",
                 action,
+                "/etc/polkit-1/rules.d/50-systemctl-mqtt.rules",
+                # org.freedesktop.login1.lock-sessions
+                json.dumps("org.freedesktop.login1.power-off"),
+                json.dumps(_get_username() or "USERNAME"),
             )
         else:
             _LOGGER.error("failed to schedule %s: %s", action, exc)

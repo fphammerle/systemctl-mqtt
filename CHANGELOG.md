@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - entity `sensor.[hostname]_unit_system_[unit_name]_active_state`
     for each command-line parameter `--monitor-system-unit [unit_name]`
 - command-line option `--log-level {debug,info,warning,error,critical}`
+- suggest polkit rule when poweroff fails due to
+  `org.freedesktop.DBus.Error.InteractiveAuthorizationRequired`
+  (https://github.com/fphammerle/systemctl-mqtt/issues/67)
 - declare compatibility with `python3.11`, `python3.12` & `python3.13`
 
 ### Changed
