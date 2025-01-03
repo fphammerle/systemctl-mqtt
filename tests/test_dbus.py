@@ -115,16 +115,17 @@ class DBusErrorResponseMock(jeepney.wrappers.DBusErrorResponse):
         self.data = data
 
 
-@pytest.mark.parametrize("action", ["poweroff"])
 @pytest.mark.parametrize(
-    ("error_name", "error_message", "log_message"),
+    ("action", "error_name", "error_message", "log_message"),
     [
         (
+            "poweroff",
             "test error",
             "test message",
             "[test error] ('test message',)",
         ),
         (
+            "poweroff",
             "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired",
             "Interactive authentication required.",
             """interactive authorization required
@@ -139,11 +140,27 @@ polkit.addRule(function(action, subject) {
                 "{{username}}", getpass.getuser()
             ),
         ),
+        (
+            "reboot",
+            "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired",
+            "Interactive authentication required.",
+            """interactive authorization required
+
+create /etc/polkit-1/rules.d/50-systemctl-mqtt.rules and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === "org.freedesktop.login1.reboot" && subject.user === "{{username}}") {
+        return polkit.Result.YES;
+    }
+});
+""".replace(
+                "{{username}}", getpass.getuser()
+            ),
+        ),
     ],
 )
 def test__schedule_shutdown_fail(
-    caplog, action, error_name, error_message, log_message
-):
+    caplog, action: str, error_name: str, error_message: str, log_message: str
+) -> None:
     login_manager_mock = unittest.mock.MagicMock()
     login_manager_mock.ScheduleShutdown.side_effect = DBusErrorResponseMock(
         name=error_name,

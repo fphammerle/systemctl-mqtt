@@ -48,6 +48,26 @@ def _get_username() -> typing.Optional[str]:
         return None
 
 
+def _log_interactive_authorization_required(
+    *, action_label: str, action_id: str
+) -> None:
+    _LOGGER.error(
+        """failed to %s: interactive authorization required
+
+create %s and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === %s && subject.user === %s) {
+        return polkit.Result.YES;
+    }
+});
+""",
+        action_label,
+        "/etc/polkit-1/rules.d/50-systemctl-mqtt.rules",
+        json.dumps(action_id),
+        json.dumps(_get_username() or "USERNAME"),
+    )
+
+
 def get_login_manager_signal_match_rule(member: str) -> jeepney.MatchRule:
     return jeepney.MatchRule(
         type="signal",
@@ -176,21 +196,10 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
             exc.name == "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired"
             and exc.data == ("Interactive authentication required.",)
         ):
-            _LOGGER.error(
-                """failed to schedule %s: interactive authorization required
-
-create %s and insert the following rule:
-polkit.addRule(function(action, subject) {
-    if(action.id === %s && subject.user === %s) {
-        return polkit.Result.YES;
-    }
-});
-""",
-                action,
-                "/etc/polkit-1/rules.d/50-systemctl-mqtt.rules",
-                # org.freedesktop.login1.lock-sessions
-                json.dumps("org.freedesktop.login1.power-off"),
-                json.dumps(_get_username() or "USERNAME"),
+            _log_interactive_authorization_required(
+                action_label="schedule " + action,
+                action_id="org.freedesktop.login1."
+                + {"poweroff": "power-off"}.get(action, action),
             )
         else:
             _LOGGER.error("failed to schedule %s: %s", action, exc)
