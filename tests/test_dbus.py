@@ -254,6 +254,52 @@ def test_lock_all_sessions(caplog):
     assert caplog.records[0].message == "instruct all sessions to activate screen locks"
 
 
+@pytest.mark.parametrize(
+    ("error_name", "error_message", "log_message"),
+    [
+        (
+            "test error",
+            "test message",
+            "[test error] ('test message',)",
+        ),
+        (
+            "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired",
+            "Interactive authentication required.",
+            """interactive authorization required
+
+create /etc/polkit-1/rules.d/50-systemctl-mqtt.rules and insert the following rule:
+polkit.addRule(function(action, subject) {
+    if(action.id === "org.freedesktop.login1.lock-sessions" && subject.user === "{{username}}") {
+        return polkit.Result.YES;
+    }
+});
+""".replace(
+                "{{username}}", getpass.getuser()
+            ),
+        ),
+    ],
+)
+def test_lock_all_sessions_fail(
+    caplog: pytest.LogCaptureFixture,
+    error_name: str,
+    error_message: str,
+    log_message: str,
+) -> None:
+    login_manager_mock = unittest.mock.MagicMock()
+    login_manager_mock.LockSessions.side_effect = DBusErrorResponseMock(
+        name=error_name, data=(error_message,)
+    )
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.login_manager.get_login_manager_proxy",
+        return_value=login_manager_mock,
+    ), caplog.at_level(logging.ERROR):
+        systemctl_mqtt._dbus.login_manager.lock_all_sessions()
+    login_manager_mock.LockSessions.assert_called_once()
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert caplog.records[0].message == f"failed to lock all sessions: {log_message}"
+
+
 async def _get_unit_path_mock(  # pylint: disable=unused-argument
     *, service_manager: jeepney.io.asyncio.Proxy, unit_name: str
 ) -> str:

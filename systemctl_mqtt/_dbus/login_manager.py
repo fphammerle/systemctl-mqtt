@@ -192,10 +192,7 @@ def schedule_shutdown(*, action: str, delay: datetime.timedelta) -> None:
         #       string:poweroff "uint64:$(date --date=10min +%s)000000"
         login_manager.ScheduleShutdown(action=action, time=time)
     except jeepney.wrappers.DBusErrorResponse as exc:
-        if (
-            exc.name == "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired"
-            and exc.data == ("Interactive authentication required.",)
-        ):
+        if exc.name == "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired":
             _log_interactive_authorization_required(
                 action_label="schedule " + action,
                 action_id="org.freedesktop.login1."
@@ -216,4 +213,14 @@ def lock_all_sessions() -> None:
     $ loginctl lock-sessions
     """
     _LOGGER.info("instruct all sessions to activate screen locks")
-    get_login_manager_proxy().LockSessions()
+    login_manager = get_login_manager_proxy()
+    try:
+        login_manager.LockSessions()
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        if exc.name == "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired":
+            _log_interactive_authorization_required(
+                action_label="lock all sessions",
+                action_id="org.freedesktop.login1.lock-sessions",
+            )
+        else:
+            _LOGGER.error("failed to lock all sessions: %s", exc)
