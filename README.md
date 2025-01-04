@@ -13,7 +13,6 @@ MQTT client triggering & reporting shutdown on [systemd](https://freedesktop.org
 
 ```sh
 $ pip3 install --user --upgrade systemctl-mqtt
-$ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
 ```
 
 On debian-based systems, a subset of dependencies can optionally be installed via:
@@ -22,6 +21,12 @@ $ sudo apt-get install --no-install-recommends python3-jeepney python3-paho-mqtt
 ```
 
 ## Usage
+
+```sh
+$ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
+```
+
+`systemctl-mqtt --help` explains all available command-line options / parameters.
 
 ### Schedule Poweroff
 
