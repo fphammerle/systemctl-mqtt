@@ -95,8 +95,6 @@ enables reports on topic
 
 ## Home Assistant 🏡
 
-### Automatic Discovery
-
 When [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
 is enabled (default in Home Assistant ≥0.117.0), the following entities will be
 added automatically:
@@ -111,40 +109,3 @@ added automatically:
 
 Pass `--homeassistant-discovery-prefix custom-prefix` to `systemctl-mqtt` when
 using a custom discovery topic prefix.
-
-### Manual YAML Configuration
-
-#### Send Poweroff Command
-
-```yaml
-# https://www.home-assistant.io/docs/mqtt/broker/#configuration-variables
-mqtt:
-  broker: BROKER_HOSTNAME_OR_IP_ADDRESS
-  # credentials, additional options…
-
-script:
-  poweroff_raspberry_pi:
-    sequence:
-      service: mqtt.publish
-      data:
-        topic: systemctl/raspberrypi/poweroff
-
-homeassistant:
-  customize:
-    script.poweroff_raspberry_pi:
-      friendly_name: poweroff pi
-      icon: mdi:power
-```
-
-#### Trigger Automation on Shutdown
-
-```yaml
-automation:
-- trigger:
-    platform: mqtt
-    topic: systemctl/raspberrypi/preparing-for-shutdown
-    payload: 'true'
-  action:
-    service: switch.turn_off
-    entity_id: switch.desk_lamp
-```
