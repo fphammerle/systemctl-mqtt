@@ -237,7 +237,7 @@ class _State:
 
 class _MQTTAction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def trigger(self, state: _State) -> None:
+    def trigger(self, state: _State, message_topic: str) -> None:
         pass  # pragma: no cover
 
     def __str__(self) -> str:
@@ -283,6 +283,8 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 }
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
+    # WIP: and replace action_by_topic[message.topic.value] with search via
+    # aiomqtt.Topic.match to find _MQTTActionControlUnit and pass message.topic as an additional parameter to trigger
     action_by_topic: typing.Dict[str, _MQTTAction] = {}
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
