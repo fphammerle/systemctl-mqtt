@@ -22,6 +22,9 @@ On debian-based systems, a subset of dependencies can optionally be installed vi
 $ sudo apt-get install --no-install-recommends python3-jeepney python3-paho-mqtt
 ```
 
+Follow instructions in [systemd-user.service](systemd-user.service) to start
+systemctl-mqtt automatically via systemd.
+
 ### Via Docker Compose 🐳
 
 1. Clone this repository.

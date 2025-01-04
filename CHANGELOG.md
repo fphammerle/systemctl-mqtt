@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- added systemd user service config for autostart
+  (https://github.com/fphammerle/systemctl-mqtt/issues/66)
+
 ## [1.0.0] - 2025-01-04
 ### Added
 - suspend when receiving message on topic `systemctl/[hostname]/suspend`
