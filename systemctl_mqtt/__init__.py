@@ -37,6 +37,7 @@ import jeepney.io.asyncio
 
 import systemctl_mqtt._dbus.login_manager
 import systemctl_mqtt._dbus.service_manager
+import systemctl_mqtt._dbus.control_manager
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._mqtt
 
@@ -246,6 +247,12 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
         )
 
 
+class _MQTTActionStartServiceAnsible(_MQTTAction):
+    # pylint: disable=too-few-public-methods
+    def trigger(self, state: _State) -> None:
+        systemctl_mqtt._dbus.control_manager.start_ansible()
+
+
 class _MQTTActionLockAllSessions(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
@@ -264,8 +271,8 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
     "poweroff": _MQTTActionSchedulePoweroff(),
     "lock-all-sessions": _MQTTActionLockAllSessions(),
     "suspend": _MQTTActionSuspend(),
+    "start-ansible":_MQTTActionStartServiceAnsible(),
 }
-
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
     action_by_topic: typing.Dict[str, _MQTTAction] = {}
