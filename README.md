@@ -41,6 +41,19 @@ $ systemctl-mqtt --mqtt-host HOSTNAME_OR_IP_ADDRESS
 
 `systemctl-mqtt --help` explains all available command-line options / parameters.
 
+### MQTT via TLS
+
+TLS is enabled by default.
+Run `systemctl-mqtt --mqtt-disable-tls …` to disable TLS.
+
+### MQTT Authentication
+
+```sh
+systemctl-mqtt --mqtt-username me --mqtt-password-file /run/secrets/password …
+# or for testing (unsafe):
+systemctl-mqtt --mqtt-username me --mqtt-password secret …
+```
+
 ### Schedule Poweroff
 
 Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/poweroff`.
@@ -48,6 +61,8 @@ Schedule poweroff by sending a MQTT message to topic `systemctl/hostname/powerof
 ```sh
 $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/poweroff -n
 ```
+
+Adapt delay via: `systemctl-mqtt --poweroff-delay-seconds 60 …`
 
 ### Shutdown Report
 
@@ -132,23 +147,4 @@ automation:
   action:
     service: switch.turn_off
     entity_id: switch.desk_lamp
-```
-
-## MQTT via TLS
-
-TLS is enabled by default.
-Run `systemctl-mqtt --mqtt-disable-tls …` to disable TLS.
-
-## MQTT Authentication
-
-```sh
-systemctl-mqtt --mqtt-username me --mqtt-password-file /run/secrets/password …
-# or for testing (unsafe):
-systemctl-mqtt --mqtt-username me --mqtt-password secret …
-```
-
-## Adapt Poweroff Delay
-
-```sh
-systemctl-mqtt --poweroff-delay-seconds 60 …
 ```
