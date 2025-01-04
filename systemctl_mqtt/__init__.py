@@ -544,6 +544,14 @@ def _main() -> None:
         action="append",
         help="e.g. --monitor-system-unit ssh.service --monitor-system-unit custom.service",
     )
+    argparser.add_argument(
+        "--control-system-unit",
+        type=str,
+        metavar="UNIT_NAME",
+        dest="controlled_system_unit_names",
+        action="append",
+        help="e.g. --control-system-unit ssh.service --control-system-unit custom.service",
+    )
     args = argparser.parse_args()
     logging.root.setLevel(_ARGUMENT_LOG_LEVEL_MAPPING[args.log_level])
     if args.mqtt_port:
