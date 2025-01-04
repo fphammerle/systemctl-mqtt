@@ -65,6 +65,7 @@ class _State:
         homeassistant_discovery_object_id: str,
         poweroff_delay: datetime.timedelta,
         monitored_system_unit_names: typing.List[str],
+        controlled_system_unit_name: str,
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
@@ -76,6 +77,7 @@ class _State:
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
         self._monitored_system_unit_names = monitored_system_unit_names
+        self._controlled_system_unit_name = controlled_system_unit_name
 
     @property
     def mqtt_topic_prefix(self) -> str:
@@ -95,6 +97,10 @@ class _State:
     @property
     def monitored_system_unit_names(self) -> typing.List[str]:
         return self._monitored_system_unit_names
+
+    @property
+    def controlled_system_unit_name(self) -> str:
+        return self._controlled_system_unit_name
 
     @property
     def shutdown_lock_acquired(self) -> bool:
@@ -247,10 +253,10 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
         )
 
 
-class _MQTTActionStartServiceAnsible(_MQTTAction):
+class _MQTTActionControlUnit(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
-        systemctl_mqtt._dbus.control_manager.start_ansible()
+        systemctl_mqtt._dbus.control_manager.control_unit()
 
 
 class _MQTTActionLockAllSessions(_MQTTAction):
@@ -271,7 +277,13 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
     "poweroff": _MQTTActionSchedulePoweroff(),
     "lock-all-sessions": _MQTTActionLockAllSessions(),
     "suspend": _MQTTActionSuspend(),
-    "start-ansible":_MQTTActionStartServiceAnsible(),
+    # NOK:
+    # INFO:subscribing to systemctl/fcos-41.hp.molecule.lab/unit/system/<property object at 0x7fbf625b82c0>
+    # "unit/system/" + str(_State.controlled_system_unit_name):_MQTTActionControlUnit(),
+    #
+    # How can we make the following work without moving _MQTT_TOPIC_SUFFIX_ACTION_MAPPING into _run ?
+    #
+    "unit/system/" + "controlled_system_unit_name":_MQTTActionControlUnit(),
 }
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
@@ -422,6 +434,7 @@ async def _run(  # pylint: disable=too-many-arguments
     homeassistant_discovery_object_id: str,
     poweroff_delay: datetime.timedelta,
     monitored_system_unit_names: typing.List[str],
+    controlled_system_unit_name: str,
     mqtt_disable_tls: bool = False,
 ) -> None:
     state = _State(
@@ -430,6 +443,7 @@ async def _run(  # pylint: disable=too-many-arguments
         homeassistant_discovery_object_id=homeassistant_discovery_object_id,
         poweroff_delay=poweroff_delay,
         monitored_system_unit_names=monitored_system_unit_names,
+        controlled_system_unit_name=controlled_system_unit_name,
     )
     _LOGGER.info(
         "connecting to MQTT broker %s:%d (TLS %s)",
@@ -592,5 +606,6 @@ def _main() -> None:
             homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
             monitored_system_unit_names=args.monitored_system_unit_names or [],
+            controlled_system_unit_name=args.controlled_system_unit_name,
         )
     )

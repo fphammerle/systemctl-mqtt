@@ -62,7 +62,7 @@ class SystemdManager(systemctl_mqtt._dbus.Properties):
 
 #     # pylint: disable=invalid-name
 
-def start_ansible():
+def control_unit():
     proxy = get_systemd_manager_proxy()
     try:
         reply = proxy.StartUnit("ansible-pull.service", "replace")
