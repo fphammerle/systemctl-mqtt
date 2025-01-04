@@ -11,6 +11,8 @@ MQTT client triggering & reporting shutdown on [systemd](https://freedesktop.org
 
 ## Setup
 
+### Via Pip
+
 ```sh
 $ pip3 install --user --upgrade systemctl-mqtt
 ```
@@ -19,6 +21,17 @@ On debian-based systems, a subset of dependencies can optionally be installed vi
 ```sh
 $ sudo apt-get install --no-install-recommends python3-jeepney python3-paho-mqtt
 ```
+
+### Via Docker Compose 🐳
+
+1. Clone this repository.
+2. Load [AppArmor](https://en.wikipedia.org/wiki/AppArmor) profile:
+   `sudo apparmor_parser ./docker-apparmor-profile`
+3. `sudo docker-compose up --build`
+
+Pre-built docker image are available at https://hub.docker.com/r/fphammerle/systemctl-mqtt/tags
+
+Annotation of signed tags `docker/*` contains docker image digests: https://github.com/fphammerle/systemctl-mqtt/tags
 
 ## Usage
 
@@ -120,18 +133,6 @@ automation:
     service: switch.turn_off
     entity_id: switch.desk_lamp
 ```
-
-## Docker 🐳
-
-1. Clone this repository.
-2. Edit `docker-compose.yml`.
-3. Load [AppArmor](https://en.wikipedia.org/wiki/AppArmor) profile:
-   `sudo apparmor_parser ./docker-apparmor-profile`
-4. `sudo docker-compose up --build`
-
-Pre-built docker image are available at https://hub.docker.com/r/fphammerle/systemctl-mqtt/tags
-
-Annotation of signed tags `docker/*` contains docker image digests: https://github.com/fphammerle/systemctl-mqtt/tags
 
 ## MQTT via TLS
 
