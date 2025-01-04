@@ -548,9 +548,8 @@ def _main() -> None:
         "--control-system-unit",
         type=str,
         metavar="UNIT_NAME",
-        dest="controlled_system_unit_names",
-        action="append",
-        help="e.g. --control-system-unit ssh.service --control-system-unit custom.service",
+        dest="controlled_system_unit_name",
+        help="e.g. --control-system-unit ansible-pull.service",
     )
     args = argparser.parse_args()
     logging.root.setLevel(_ARGUMENT_LOG_LEVEL_MAPPING[args.log_level])
