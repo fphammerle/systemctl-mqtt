@@ -1,0 +1,57 @@
+# tested with systemd=252.31-1~deb12u1+rpi1 on raspberry pi os 12/bookworm
+# 1. copy to ~/.config/systemd/user/systemctl-mqtt.service
+# 2. edit parameters in ExecStart
+# 3. systemctl --user daemon-reload
+# 4. systemctl --user restart systemctl-mqtt.service
+# 5. sudo loginctl enable-linger $USER
+# 6. systemctl --user enable systemctl-mqtt.service
+[Unit]
+Documentation=https://github.com/fphammerle/systemctl-mqtt
+[Service]
+KeyringMode=private
+# > Failed to update dynamic user credentials: Permission denied
+DynamicUser=no
+# > Failed at step CAPABILITIES spawning …: Operation not permitted
+#CapabilityBoundingSet=
+NoNewPrivileges=yes
+# > Failed at step CAPABILITIES spawning …: Operation not permitted
+PrivateDevices=no
+# > Failed at step CAPABILITIES spawning …: Operation not permitted
+ProtectClock=no
+# > Failed at step CAPABILITIES spawning …: Operation not permitted
+ProtectKernelLogs=no
+ProtectControlGroups=yes
+# > Failed at step CAPABILITIES spawning …: Operation not permitted
+ProtectKernelModules=no
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=~user pid net uts mnt ipc cgroup
+RestrictSUIDSGID=yes
+# > ProtectHostname=yes is configured, but UTS namespace setup is prohibited
+# . (container manager?), ignoring namespace setup.
+ProtectHostname=no
+LockPersonality=yes
+ProtectKernelTunables=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictRealtime=yes
+# ineffective?
+DeviceAllow=
+ProtectSystem=strict
+ProtectProc=invisible
+ProcSubset=pid
+# ineffective
+ProtectHome=yes
+PrivateNetwork=no
+PrivateUsers=no
+PrivateTmp=yes
+SystemCallFilter=~@clock @swap @resources @reboot @raw-io @privileged \
+    @obsolete @mount @module @debug @cpu-emulation
+# ineffective
+#IPAddressAllow=
+#IPAddressDeny=any
+UMask=0077
+#ExecStartPre=/usr/lib/systemd/systemd-networkd-wait-online
+Type=exec
+ExecStart=%h/.local/bin/systemctl-mqtt --mqtt-host localhost --log-level debug
+[Install]
+WantedBy=default.target
