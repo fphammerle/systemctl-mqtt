@@ -267,8 +267,10 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
 
 class _MQTTActionRestartUnit(_MQTTAction):
     # pylint: disable=too-few-public-methods
+    def __init__(self, unit_name: str):
+        self._unit_name = unit_name
     def trigger(self, state: _State) -> None:
-        systemctl_mqtt._dbus.control_manager.restart_unit(unit_name="ansible-pull.service")
+        systemctl_mqtt._dbus.control_manager.restart_unit(unit_name=self._unit_name)
 
 
 class _MQTTActionLockAllSessions(_MQTTAction):
@@ -303,7 +305,7 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
         _LOGGER.info("subscribing to %s", topic)
         await mqtt_client.subscribe(topic)
-        action = _MQTTActionRestartUnit()
+        action = _MQTTActionRestartUnit(unit_name=unit_name)
         action_by_topic[topic] = action
 
     async for message in mqtt_client.messages:
