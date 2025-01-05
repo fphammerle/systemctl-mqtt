@@ -220,6 +220,7 @@ class _State:
                 "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
             }
         for unit_name in self._monitored_system_unit_names:
+            _LOGGER.debug("adding %s to monitoring config", unit_name)
             config["components"]["unit/system/" + unit_name + "/active-state"] = {  # type: ignore
                 "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-active-state",
                 "object_id": f"{hostname}_unit_system_{unit_name}_active_state",
@@ -235,6 +236,7 @@ class _State:
                 "object_id": f"{hostname}_unit_system_{unit_name}_restart",
                 "name": f"{unit_name} restart",
                 "platform": "button",
+                # TODO: Rename get_system_unit_active_state_mqtt_topic to get_system_unit_restart_mqtt_topic ?
                 "state_topic": self.get_system_unit_active_state_mqtt_topic(
                     unit_name=unit_name
                 ),
@@ -307,9 +309,21 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
     # "unit/system/" + controlled_system_unit_name + "/" :_MQTTActionControlUnit(),
 
     # This failes as it only adds the second controlled_system_unit_name sliced by char ...
-    # for controlled_system_unit_name in state.controlled_system_unit_names:
-    #     topic = state.mqtt_topic_prefix + "/unit/system/" + controlled_system_unit_name + "/restart"
+    #
+    # OK
+    # for unit_name in state.monitored_system_unit_names:
+    #
+    # NOK
+    for unit_name in state.controlled_system_unit_names:
+        topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
+        # topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
+        _LOGGER.info("subscribing to %s", topic)
+        await mqtt_client.subscribe(topic)
+        action = _MQTTActionControlUnit()
+        action_by_topic[topic] = action
 
+    # This works for a single element controlled_system_unit_names ... but only uses last element
+    # Is --monitor-system-unit working with multiple elements? 
     # topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
     # _LOGGER.info("subscribing to %s", topic)
     # await mqtt_client.subscribe(topic)
