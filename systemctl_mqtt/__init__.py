@@ -249,7 +249,7 @@ class _State:
 
 class _MQTTAction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def trigger(self, state: _State, message_topic: str) -> None:
+    def trigger(self, state: _State) -> None:
         pass  # pragma: no cover
 
     def __str__(self) -> str:
