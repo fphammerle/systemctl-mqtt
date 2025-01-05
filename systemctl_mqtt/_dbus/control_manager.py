@@ -47,7 +47,7 @@ class SystemdManager(systemctl_mqtt._dbus.Properties):
             remote_obj=self, method="RestartUnit", signature="ss", body=(name,mode)
         )
 
-def control_unit(unit_name: str):
+def restart_unit(unit_name: str):
     proxy = get_systemd_manager_proxy()
     try:
         reply = proxy.RestartUnit(unit_name, "replace")

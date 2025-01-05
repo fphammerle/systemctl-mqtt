@@ -268,7 +268,7 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
 class _MQTTActionControlUnit(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
-        systemctl_mqtt._dbus.control_manager.control_unit(unit_name="ansible-pull.service")
+        systemctl_mqtt._dbus.control_manager.restart_unit(unit_name="ansible-pull.service")
 
 
 class _MQTTActionLockAllSessions(_MQTTAction):
