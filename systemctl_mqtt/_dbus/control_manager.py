@@ -15,9 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Gosteli
-# This file allow for a MVP of --control-system-unit [unit_name]
-
 import jeepney
 import jeepney.io.blocking
 
