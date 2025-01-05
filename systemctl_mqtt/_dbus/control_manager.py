@@ -46,23 +46,7 @@ class SystemdManager(systemctl_mqtt._dbus.Properties):
         return jeepney.new_method_call(
             remote_obj=self, method="RestartUnit", signature="ss", body=(name,mode)
         )
-        
 
-# class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
-#     """
-#     https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html#Unit%20Objects
-#     """
-
-#     # pylint: disable=too-few-public-methods
-
-#     interface = "org.freedesktop.systemd1.Unit"
-
-#     def __init__(self, *, object_path: str):
-#         super().__init__(object_path=object_path, bus_name="org.freedesktop.systemd1")
-
-#     # pylint: disable=invalid-name
-
-# WIP: First Shot - working
 def control_unit():
     proxy = get_systemd_manager_proxy()
     try:
