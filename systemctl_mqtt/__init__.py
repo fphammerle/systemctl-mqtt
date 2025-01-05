@@ -93,6 +93,9 @@ class _State:
     def get_system_unit_active_state_mqtt_topic(self, *, unit_name: str) -> str:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/active-state"
 
+    def get_system_unit_restart_mqtt_topic(self, *, unit_name: str) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
+
     @property
     def monitored_system_unit_names(self) -> typing.List[str]:
         return self._monitored_system_unit_names
@@ -235,8 +238,7 @@ class _State:
                 "object_id": f"{hostname}_unit_system_{unit_name}_restart",
                 "name": f"{unit_name} restart",
                 "platform": "button",
-                # TODO: Rename get_system_unit_active_state_mqtt_topic to get_system_unit_restart_mqtt_topic ?
-                "state_topic": self.get_system_unit_active_state_mqtt_topic(
+                "command_topic": self.get_system_unit_restart_mqtt_topic(
                     unit_name=unit_name
                 ),
             }
