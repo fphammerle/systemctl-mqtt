@@ -65,9 +65,9 @@ def restart_unit(unit_name: str):
     proxy = get_systemd_manager_proxy()
     try:
         reply = proxy.RestartUnit(unit_name, "replace")
-        _LOGGER.info(f"called successfully: {reply}")
+        _LOGGER.debug(f"Restarting unit: {unit_name}")
     except Exception as e:
-        _LOGGER.error(f"Failed to call: {e}")
+        _LOGGER.error(f"Failed to restart unit: {unit_name}")
 
 def get_systemd_manager_proxy() -> jeepney.io.blocking.Proxy:
     # https://jeepney.readthedocs.io/en/latest/integrate.html
