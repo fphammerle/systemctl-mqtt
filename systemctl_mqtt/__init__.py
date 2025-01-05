@@ -229,6 +229,16 @@ class _State:
                     unit_name=unit_name
                 ),
             }
+        for unit_name in self._controlled_system_unit_names:
+            config["components"]["unit/system/" + unit_name + "/restart"] = {  # type: ignore
+                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-restart",
+                "object_id": f"{hostname}_unit_system_{unit_name}_restart",
+                "name": f"{unit_name} restart",
+                "platform": "button",
+                "state_topic": self.get_system_unit_active_state_mqtt_topic(
+                    unit_name=unit_name
+                ),
+            }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         await mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
@@ -300,11 +310,11 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
     # for controlled_system_unit_name in state.controlled_system_unit_names:
     #     topic = state.mqtt_topic_prefix + "/unit/system/" + controlled_system_unit_name + "/restart"
 
-    topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
-    _LOGGER.info("subscribing to %s", topic)
-    await mqtt_client.subscribe(topic)
-    action = _MQTTActionControlUnit()
-    action_by_topic[topic] = action
+    # topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
+    # _LOGGER.info("subscribing to %s", topic)
+    # await mqtt_client.subscribe(topic)
+    # action = _MQTTActionControlUnit()
+    # action_by_topic[topic] = action
 
     async for message in mqtt_client.messages:
         if message.retain:
@@ -619,6 +629,6 @@ def _main() -> None:
             homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
             monitored_system_unit_names=args.monitored_system_unit_names or [],
-            controlled_system_unit_names=args.controlled_system_unit_names,
+            controlled_system_unit_names=args.controlled_system_unit_names or [],
         )
     )
