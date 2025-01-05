@@ -37,7 +37,6 @@ import jeepney.io.asyncio
 
 import systemctl_mqtt._dbus.login_manager
 import systemctl_mqtt._dbus.service_manager
-import systemctl_mqtt._dbus.control_manager
 import systemctl_mqtt._homeassistant
 import systemctl_mqtt._mqtt
 
@@ -270,7 +269,7 @@ class _MQTTActionRestartUnit(_MQTTAction):
     def __init__(self, unit_name: str):
         self._unit_name = unit_name
     def trigger(self, state: _State) -> None:
-        systemctl_mqtt._dbus.control_manager.restart_unit(unit_name=self._unit_name)
+        systemctl_mqtt._dbus.service_manager.restart_unit(unit_name=self._unit_name)
 
 
 class _MQTTActionLockAllSessions(_MQTTAction):
