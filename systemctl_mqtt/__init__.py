@@ -600,6 +600,7 @@ def _main() -> None:
         type=str,
         metavar="UNIT_NAME",
         dest="controlled_system_unit_names",
+        action="append",
         help="e.g. --control-system-unit ansible-pull.service --control-system-unit custom.service",
     )
     args = argparser.parse_args()
