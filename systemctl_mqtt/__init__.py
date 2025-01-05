@@ -277,9 +277,9 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
     "poweroff": _MQTTActionSchedulePoweroff(),
     "lock-all-sessions": _MQTTActionLockAllSessions(),
     "suspend": _MQTTActionSuspend(),
-    # WIP: https://github.com/fphammerle/systemctl-mqtt/pull/180
-    # TODO: controlled_system_unit_names
-    "unit/system/controlled_system_unit_name" :_MQTTActionControlUnit(),
+    # WIP: Cannot add the restart here because controlled_system_unit_name is not accessible ...
+    # also would require a loop ...
+    # "unit/system/" + controlled_system_unit_name + "/" :_MQTTActionControlUnit(),
 }
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
@@ -291,6 +291,16 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         _LOGGER.info("subscribing to %s", topic)
         await mqtt_client.subscribe(topic)
         action_by_topic[topic] = action
+
+    # WIP: Subscribe restart topic here
+    # https://github.com/fphammerle/systemctl-mqtt/pull/180
+    # "unit/system/" + controlled_system_unit_name + "/" :_MQTTActionControlUnit(),
+    topic = state.mqtt_topic_prefix + "/unit/system/ansible-pull.service/restart"
+    _LOGGER.info("subscribing to %s", topic)
+    await mqtt_client.subscribe(topic)
+    action = _MQTTActionControlUnit()
+    action_by_topic[topic] = action
+
     async for message in mqtt_client.messages:
         if message.retain:
             _LOGGER.info("ignoring retained message on topic %r", message.topic.value)
