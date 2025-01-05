@@ -304,31 +304,12 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         await mqtt_client.subscribe(topic)
         action_by_topic[topic] = action
 
-    # WIP: Subscribe restart topic here
-    # https://github.com/fphammerle/systemctl-mqtt/pull/180
-    # "unit/system/" + controlled_system_unit_name + "/" :_MQTTActionControlUnit(),
-
-    # This failes as it only adds the second controlled_system_unit_name sliced by char ...
-    #
-    # OK
-    # for unit_name in state.monitored_system_unit_names:
-    #
-    # NOK
     for unit_name in state.controlled_system_unit_names:
         topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
-        # topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
         _LOGGER.info("subscribing to %s", topic)
         await mqtt_client.subscribe(topic)
         action = _MQTTActionControlUnit()
         action_by_topic[topic] = action
-
-    # This works for a single element controlled_system_unit_names ... but only uses last element
-    # Is --monitor-system-unit working with multiple elements? 
-    # topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
-    # _LOGGER.info("subscribing to %s", topic)
-    # await mqtt_client.subscribe(topic)
-    # action = _MQTTActionControlUnit()
-    # action_by_topic[topic] = action
 
     async for message in mqtt_client.messages:
         if message.retain:
