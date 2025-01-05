@@ -295,6 +295,11 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
     # WIP: Subscribe restart topic here
     # https://github.com/fphammerle/systemctl-mqtt/pull/180
     # "unit/system/" + controlled_system_unit_name + "/" :_MQTTActionControlUnit(),
+
+    # This failes as it only adds the second controlled_system_unit_name sliced by char ...
+    for controlled_system_unit_name in state.controlled_system_unit_names:
+        topic = state.mqtt_topic_prefix + "/unit/system/" + controlled_system_unit_name + "/restart"
+
     topic = state.mqtt_topic_prefix + "/unit/system/" + state.controlled_system_unit_names + "/restart"
     _LOGGER.info("subscribing to %s", topic)
     await mqtt_client.subscribe(topic)
