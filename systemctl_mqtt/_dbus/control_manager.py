@@ -42,7 +42,7 @@ class SystemdManager(systemctl_mqtt._dbus.Properties):
 
     # pylint: disable=invalid-name
 
-    def StartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
+    def RestartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
         return jeepney.new_method_call(
             remote_obj=self, method="RestartUnit", signature="ss", body=(name,mode)
         )
@@ -50,7 +50,7 @@ class SystemdManager(systemctl_mqtt._dbus.Properties):
 def control_unit():
     proxy = get_systemd_manager_proxy()
     try:
-        reply = proxy.StartUnit("ansible-pull.service", "replace")
+        reply = proxy.RestartUnit("ansible-pull.service", "replace")
         _LOGGER.info(f"called successfully: {reply}")
     except Exception as e:
         _LOGGER.error(f"Failed to call: {e}")
