@@ -222,7 +222,6 @@ class _State:
                 "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
             }
         for unit_name in self._monitored_system_unit_names:
-            _LOGGER.debug("adding %s to monitoring config", unit_name)
             config["components"]["unit/system/" + unit_name + "/active-state"] = {  # type: ignore
                 "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-active-state",
                 "object_id": f"{hostname}_unit_system_{unit_name}_active_state",
