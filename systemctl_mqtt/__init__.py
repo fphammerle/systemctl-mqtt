@@ -293,6 +293,7 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
     "suspend": _MQTTActionSuspend(),
 }
 
+
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
     action_by_topic: typing.Dict[str, _MQTTAction] = {}
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
