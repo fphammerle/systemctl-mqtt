@@ -347,6 +347,7 @@ async def test__dbus_signal_loop(monitored_system_unit_names: typing.List[str]) 
                 state=state_mock, mqtt_client=unittest.mock.MagicMock()
             )
         )
+
         async def _abort_after_msg_queue():
             await msg_queue.join()
             loop_task.cancel()
