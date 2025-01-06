@@ -4,3 +4,5 @@
 build/
 dist/
 tags
+__pycache__
+
