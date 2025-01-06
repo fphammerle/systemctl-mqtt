@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import jeepney
 import logging
+import jeepney
 import systemctl_mqtt._dbus
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,9 +65,10 @@ def restart_unit(unit_name: str):
     proxy = get_service_manager_proxy()
     try:
         proxy.RestartUnit(unit_name, "replace")
-        _LOGGER.debug(f"Restarting unit: {unit_name}")
+        _LOGGER.debug("Restarting unit: %s", unit_name)
     except Exception as e:
-        _LOGGER.error(f"Failed to restart unit: {unit_name} because {e}")
+        _LOGGER.error("Failed to restart unit: %s because %s", unit_name, e)
+
 
 def get_service_manager_proxy() -> jeepney.io.blocking.Proxy:
     # https://jeepney.readthedocs.io/en/latest/integrate.html
