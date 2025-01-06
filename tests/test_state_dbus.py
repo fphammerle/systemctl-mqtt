@@ -161,9 +161,9 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
 @pytest.mark.parametrize(
     "monitored_system_unit_names", [[], ["foo.service", "bar.service"]]
 )
-# @pytest.mark.parametrize(
-#     "controlled_system_unit_names", [[], ["foo-control.service", "bar-control.service"]]
-# )
+@pytest.mark.parametrize(
+    "controlled_system_unit_names", [[], ["foo-control.service", "bar-control.service"]]
+)
 async def test_publish_homeassistant_device_config(
     topic_prefix: str,
     discovery_prefix: str,
@@ -179,7 +179,7 @@ async def test_publish_homeassistant_device_config(
             homeassistant_discovery_object_id=object_id,
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=monitored_system_unit_names,
-            controlled_system_unit_names=monitored_system_unit_names,
+            controlled_system_unit_names=controlled_system_unit_names,
         )
     assert state.monitored_system_unit_names == monitored_system_unit_names
     assert state.controlled_system_unit_names == controlled_system_unit_names
@@ -252,7 +252,7 @@ async def test_publish_homeassistant_device_config(
                 "object_id": f"{hostname}_unit_system_{n}_restart",
                 "name": f"{n} restart",
                 "platform": "button",
-                "state_topic": f"{topic_prefix}/unit/system/{n}/restart",
+                "command_topic": f"{topic_prefix}/unit/system/{n}/restart",
             }
             for n in controlled_system_unit_names
         },

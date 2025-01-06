@@ -40,6 +40,16 @@ def test_get_login_manager_proxy():
     assert login_manager.CanPowerOff() in {("yes",), ("challenge",)}
 
 
+# Why dooesnt this function increase the number of 101 tests + 32 errors?
+def get_systemd_manager_proxy():
+    systemd_manager = systemctl_mqtt._dbus.systemd_manager.get_systemd_manager_proxy()
+    assert isinstance(a, jeepney.io.blocking.Proxy)
+    assert systemd_manager._msggen.interface == "org.freedesktop.systemd1.Manager"
+    # TODO: Change below to something that makes sense
+    # https://freedesktop.org/wiki/Software/systemd/logind/
+    # assert systemd_manager.CanPowerOff() in {("yes",), ("challenge",)}
+
+
 def test__log_shutdown_inhibitors_some(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.return_value = (
@@ -338,7 +348,6 @@ async def test__dbus_signal_loop(monitored_system_unit_names: typing.List[str]) 
                 state=state_mock, mqtt_client=unittest.mock.MagicMock()
             )
         )
-
         async def _abort_after_msg_queue():
             await msg_queue.join()
             loop_task.cancel()
