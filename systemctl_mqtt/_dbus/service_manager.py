@@ -62,14 +62,14 @@ class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
     # pylint: disable=invalid-name
 
 def restart_unit(unit_name: str):
-    proxy = get_systemd_manager_proxy()
+    proxy = get_service_manager_proxy()
     try:
         proxy.RestartUnit(unit_name, "replace")
         _LOGGER.debug(f"Restarting unit: {unit_name}")
     except Exception as e:
         _LOGGER.error(f"Failed to restart unit: {unit_name} because {e}")
 
-def get_systemd_manager_proxy() -> jeepney.io.blocking.Proxy:
+def get_service_manager_proxy() -> jeepney.io.blocking.Proxy:
     # https://jeepney.readthedocs.io/en/latest/integrate.html
     # https://gitlab.com/takluyver/jeepney/-/blob/master/examples/aio_notify.py
     return jeepney.io.blocking.Proxy(
