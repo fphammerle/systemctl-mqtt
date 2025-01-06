@@ -165,6 +165,7 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
     "controlled_system_unit_names", [[], ["foo-control.service", "bar-control.service"]]
 )
 async def test_publish_homeassistant_device_config(
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     topic_prefix: str,
     discovery_prefix: str,
     object_id: str,
