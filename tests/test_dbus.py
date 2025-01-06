@@ -386,6 +386,7 @@ async def test__dbus_signal_loop_unit() -> None:
         homeassistant_discovery_object_id="unused",
         poweroff_delay=datetime.timedelta(),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     dbus_router_mock = unittest.mock.AsyncMock()

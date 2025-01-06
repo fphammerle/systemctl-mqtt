@@ -67,6 +67,7 @@ async def test__run(
             homeassistant_discovery_object_id=homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
@@ -171,6 +172,7 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
@@ -207,6 +209,7 @@ async def test__run_tls_default():
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     # enabled by default
@@ -240,6 +243,7 @@ async def test__run_authentication(
             homeassistant_discovery_object_id="node-id",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
@@ -272,6 +276,7 @@ async def test__run_authentication_missing_username(
                 homeassistant_discovery_object_id="node-id",
                 poweroff_delay=datetime.timedelta(),
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
     dbus_signal_loop_mock.assert_not_called()
 
@@ -301,6 +306,7 @@ async def test__run_sigint(mqtt_topic_prefix: str):
                 homeassistant_discovery_object_id="host",
                 poweroff_delay=datetime.timedelta(),
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
     async with mqtt_client_class_mock() as mqtt_client_mock:
         pass
@@ -334,6 +340,7 @@ async def test__mqtt_message_loop_trigger_poweroff(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     mqtt_client_mock.messages.__aiter__.return_value = [
@@ -382,6 +389,7 @@ async def test__mqtt_message_loop_retained(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     mqtt_client_mock.messages.__aiter__.return_value = [
@@ -423,6 +431,7 @@ def test_state_get_system_unit_active_state_mqtt_topic(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     assert (
         state.get_system_unit_active_state_mqtt_topic(unit_name=unit_name)
