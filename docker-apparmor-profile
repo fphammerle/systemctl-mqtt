@@ -62,8 +62,8 @@ profile systemctl-mqtt flags=(attach_disconnected) {
        peer=(label=unconfined),
   dbus (send)
        bus=system
-       path=/org/freedesktop/system1
-       interface=org.freedesktop.DBus.Properties
-       member=Get
+       path=/org/freedesktop/systemd1
+       interface=org.freedesktop.systemd1.Manager
+       member=RestartUnit
        peer=(label=unconfined),
 }
