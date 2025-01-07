@@ -90,11 +90,18 @@ $ mosquitto_pub -h MQTT_BROKER -t systemctl/hostname/suspend -n
 ### Monitor `ActiveState` of System Units
 
 ```
-$ mosquitto_pub --monitor-system-unit foo.service \
-    --monitor-system-unit bar.service …
+$ systemctl-mqtt --monitor-system-unit foo.service
 ```
 enables reports on topic
 `systemctl/[hostname]/unit/system/[unit_name]/active-state`.
+
+### Restarting of System Units
+
+```
+$ systemctl-mqtt  --control-system-unit <unit_name>
+```
+restarts service on topic
+`systemctl/[hostname]/unit/system/[unit_name]/restart`.
 
 ## Home Assistant 🏡
 
@@ -107,6 +114,8 @@ added automatically:
 - `button.[hostname]_logind_suspend`
 - `sensor.[hostname]_unit_system_[unit_name]_active_state`
   for `--monitor-system-unit [unit_name]`
+  - `button.[hostname]_unit_system_[unit_name]_restart`
+  for `--control-system-unit [unit_name]`
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
 
