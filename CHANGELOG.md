@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.1] - 2025-01-07
 ### Added
-- ability to restart system units using `--control_system_unit <unit_name>` as by [#154](https://github.com/fphammerle/systemctl-mqtt/issues/154)
+- ability to restart system units using `--control_system_unit <unit_name>` as by [#154](https://github.com/fphammerle/systemctl-mqtt/issues/154) from Hanspeter Gosteli (hanspeter.gosteli@gmail.com)
 
 ## [1.0.0] - 2025-01-04
 ### Added
