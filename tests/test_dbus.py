@@ -44,9 +44,6 @@ def get_service_manager_proxy():
     service_manager = systemctl_mqtt._dbus.service_manager.get_service_manager_proxy()
     assert isinstance(service_manager, jeepney.io.blocking.Proxy)
     assert service_manager._msggen.interface == "org.freedesktop.systemd1.Manager"
-    # TODO: Change below to something that makes sense
-    # https://freedesktop.org/wiki/Software/systemd/logind/
-    # assert service_manager.CanPowerOff() in {("yes",), ("challenge",)}
 
 
 def test__log_shutdown_inhibitors_some(caplog):
