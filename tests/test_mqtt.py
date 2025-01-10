@@ -437,3 +437,56 @@ def test_state_get_system_unit_active_state_mqtt_topic(
         state.get_system_unit_active_state_mqtt_topic(unit_name=unit_name)
         == f"{mqtt_topic_prefix}/unit/system/{unit_name}/active-state"
     )
+
+# WIP: Copied from test__mqtt_message_loop_trigger_poweroff
+# 
+# a single new integration test of _mqtt_message_loop that receives a message at /restart mqtt topic 
+# and thus indirectly triggers systemctl_mqtt._dbus.service_manager.ServiceManager.RestartUnit 
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine '_dbus_signal_loop' was never awaited")
+@pytest.mark.filterwarnings("ignore:coroutine '_mqtt_message_loop' was never awaited")
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
+async def test__mqtt_message_loop_trigger_restart(
+    caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str
+) -> None:
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
+        monitored_system_unit_names=[],
+        controlled_system_unit_names=["foo-bar.service"],
+    )
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic=mqtt_topic_prefix + "/restart",
+            payload=b"some-payload",
+            qos=0,
+            retain=False,
+            mid=42 // 2,
+            properties=None,
+        )
+    ]
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager.restart_unit"
+    ) as schedule_shutdown_mock, caplog.at_level(logging.DEBUG):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
+        )
+    assert sorted(mqtt_client_mock.subscribe.await_args_list) == [
+        unittest.mock.call(mqtt_topic_prefix + "/restart"),
+    ]
+    schedule_shutdown_mock.assert_called_once_with(
+        action="restart"
+    )
+    assert [
+        t for t in caplog.record_tuples[2:] if not t[2].startswith("subscribing to ")
+    ] == [
+        (
+            "systemctl_mqtt",
+            logging.DEBUG,
+            f"received message on topic '{mqtt_topic_prefix}/restart': b'some-payload'",
+        ),
+    ]
