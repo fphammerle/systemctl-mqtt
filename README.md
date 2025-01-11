@@ -100,7 +100,7 @@ enables reports on topic
 ```
 $ systemctl-mqtt  --control-system-unit <unit_name>
 ```
-restarts service on topic
+enables that a system unit can be restarted by a message on topic
 `systemctl/[hostname]/unit/system/[unit_name]/restart`.
 
 ## Home Assistant 🏡
