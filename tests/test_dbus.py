@@ -40,7 +40,7 @@ def test_get_login_manager_proxy():
     assert login_manager.CanPowerOff() in {("yes",), ("challenge",)}
 
 
-def get_service_manager_proxy():
+def test_get_service_manager_proxy():
     service_manager = systemctl_mqtt._dbus.service_manager.get_service_manager_proxy()
     assert isinstance(service_manager, jeepney.io.blocking.Proxy)
     assert service_manager._msggen.interface == "org.freedesktop.systemd1.Manager"
