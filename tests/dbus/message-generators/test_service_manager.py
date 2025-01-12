@@ -55,3 +55,9 @@ async def test__get_unit_path() -> None:
     }
     assert msg.body == ("ssh.service",)
     assert not send_kwargs
+
+def test_restart_unit():
+    mock_proxy = unittest.mock.MagicMock()
+    with unittest.mock.patch("systemctl_mqtt._dbus.service_manager.get_service_manager_proxy", return_value=mock_proxy):
+        systemctl_mqtt._dbus.service_manager.restart_unit("foo.service")
+        mock_proxy.RestartUnit.assert_called_once_with("foo.service", "replace")
