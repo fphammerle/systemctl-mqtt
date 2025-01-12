@@ -438,10 +438,6 @@ def test_state_get_system_unit_active_state_mqtt_topic(
         == f"{mqtt_topic_prefix}/unit/system/{unit_name}/active-state"
     )
 
-# WIP: Copied from test__mqtt_message_loop_trigger_poweroff
-# 
-# a single new integration test of _mqtt_message_loop that receives a message at /restart mqtt topic 
-# and thus indirectly triggers systemctl_mqtt._dbus.service_manager.ServiceManager.RestartUnit 
 
 @pytest.mark.asyncio
 @pytest.mark.filterwarnings("ignore:coroutine '_dbus_signal_loop' was never awaited")
@@ -472,7 +468,6 @@ async def test__mqtt_message_loop_trigger_restart(
         )
     ]
     with unittest.mock.patch(
-        # "systemctl_mqtt._dbus.service_manager.ServiceManager.RestartUnit"
         "systemctl_mqtt._dbus.service_manager.restart_unit"
     ) as trigger_service_restart_mock, caplog.at_level(logging.DEBUG):
         await systemctl_mqtt._mqtt_message_loop(
