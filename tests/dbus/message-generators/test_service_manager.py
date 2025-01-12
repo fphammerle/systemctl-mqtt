@@ -72,3 +72,13 @@ def test__restart_unit_method_call():
             signature="ss",
             body=("foo.service", "replace"),
         )
+
+def test_restart_unit_with_exception():
+    mock_proxy = unittest.mock.MagicMock()
+    mock_proxy.RestartUnit.side_effect = Exception("DBus error")
+    with unittest.mock.patch("systemctl_mqtt._dbus.service_manager.get_service_manager_proxy", return_value=mock_proxy), \
+         unittest.mock.patch("systemctl_mqtt._dbus.service_manager._LOGGER") as mock_logger:
+        systemctl_mqtt._dbus.service_manager.restart_unit("example.service")
+        mock_logger.error.assert_called_once_with(
+            "Failed to restart unit: %s because %s", "example.service", "DBus error"
+        )
