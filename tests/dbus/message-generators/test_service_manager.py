@@ -56,8 +56,19 @@ async def test__get_unit_path() -> None:
     assert msg.body == ("ssh.service",)
     assert not send_kwargs
 
-def test_restart_unit():
+def test__restart_unit_proxy():
     mock_proxy = unittest.mock.MagicMock()
     with unittest.mock.patch("systemctl_mqtt._dbus.service_manager.get_service_manager_proxy", return_value=mock_proxy):
         systemctl_mqtt._dbus.service_manager.restart_unit("foo.service")
         mock_proxy.RestartUnit.assert_called_once_with("foo.service", "replace")
+
+def test__restart_unit_method_call():
+    with unittest.mock.patch("jeepney.new_method_call", return_value=unittest.mock.MagicMock()) as mock_method_call:
+        service_manager = systemctl_mqtt._dbus.service_manager.ServiceManager()
+        service_manager.RestartUnit("foo.service", "replace")
+        mock_method_call.assert_called_once_with(
+            remote_obj=service_manager,
+            method="RestartUnit",
+            signature="ss",
+            body=("foo.service", "replace"),
+        )
