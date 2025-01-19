@@ -64,6 +64,7 @@ class _State:
         homeassistant_discovery_object_id: str,
         poweroff_delay: datetime.timedelta,
         monitored_system_unit_names: typing.List[str],
+        controlled_system_unit_names: typing.List[str],
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
@@ -75,6 +76,7 @@ class _State:
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
         self._monitored_system_unit_names = monitored_system_unit_names
+        self._controlled_system_unit_names = controlled_system_unit_names
 
     @property
     def mqtt_topic_prefix(self) -> str:
@@ -91,9 +93,16 @@ class _State:
     def get_system_unit_active_state_mqtt_topic(self, *, unit_name: str) -> str:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/active-state"
 
+    def get_system_unit_restart_mqtt_topic(self, *, unit_name: str) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
+
     @property
     def monitored_system_unit_names(self) -> typing.List[str]:
         return self._monitored_system_unit_names
+
+    @property
+    def controlled_system_unit_names(self) -> typing.List[str]:
+        return self._controlled_system_unit_names
 
     @property
     def shutdown_lock_acquired(self) -> bool:
@@ -222,6 +231,16 @@ class _State:
                     unit_name=unit_name
                 ),
             }
+        for unit_name in self._controlled_system_unit_names:
+            config["components"]["unit/system/" + unit_name + "/restart"] = {  # type: ignore
+                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-restart",
+                "object_id": f"{hostname}_unit_system_{unit_name}_restart",
+                "name": f"{unit_name} restart",
+                "platform": "button",
+                "command_topic": self.get_system_unit_restart_mqtt_topic(
+                    unit_name=unit_name
+                ),
+            }
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         await mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
@@ -244,6 +263,15 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
         systemctl_mqtt._dbus.login_manager.schedule_shutdown(
             action="poweroff", delay=state.poweroff_delay
         )
+
+
+class _MQTTActionRestartUnit(_MQTTAction):
+    # pylint: disable=protected-access,too-few-public-methods
+    def __init__(self, unit_name: str):
+        self._unit_name = unit_name
+
+    def trigger(self, state: _State) -> None:
+        systemctl_mqtt._dbus.service_manager.restart_unit(unit_name=self._unit_name)
 
 
 class _MQTTActionLockAllSessions(_MQTTAction):
@@ -274,6 +302,14 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         _LOGGER.info("subscribing to %s", topic)
         await mqtt_client.subscribe(topic)
         action_by_topic[topic] = action
+
+    for unit_name in state.controlled_system_unit_names:
+        topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
+        _LOGGER.info("subscribing to %s", topic)
+        await mqtt_client.subscribe(topic)
+        action = _MQTTActionRestartUnit(unit_name=unit_name)
+        action_by_topic[topic] = action
+
     async for message in mqtt_client.messages:
         if message.retain:
             _LOGGER.info("ignoring retained message on topic %r", message.topic.value)
@@ -415,6 +451,7 @@ async def _run(  # pylint: disable=too-many-arguments
     homeassistant_discovery_object_id: str,
     poweroff_delay: datetime.timedelta,
     monitored_system_unit_names: typing.List[str],
+    controlled_system_unit_names: typing.List[str],
     mqtt_disable_tls: bool = False,
 ) -> None:
     state = _State(
@@ -423,6 +460,7 @@ async def _run(  # pylint: disable=too-many-arguments
         homeassistant_discovery_object_id=homeassistant_discovery_object_id,
         poweroff_delay=poweroff_delay,
         monitored_system_unit_names=monitored_system_unit_names,
+        controlled_system_unit_names=controlled_system_unit_names,
     )
     _LOGGER.info(
         "connecting to MQTT broker %s:%d (TLS %s)",
@@ -537,6 +575,14 @@ def _main() -> None:
         action="append",
         help="e.g. --monitor-system-unit ssh.service --monitor-system-unit custom.service",
     )
+    argparser.add_argument(
+        "--control-system-unit",
+        type=str,
+        metavar="UNIT_NAME",
+        dest="controlled_system_unit_names",
+        action="append",
+        help="e.g. --control-system-unit ansible-pull.service --control-system-unit custom.service",
+    )
     args = argparser.parse_args()
     logging.root.setLevel(_ARGUMENT_LOG_LEVEL_MAPPING[args.log_level])
     if args.mqtt_port:
@@ -578,5 +624,6 @@ def _main() -> None:
             homeassistant_discovery_object_id=args.homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(seconds=args.poweroff_delay_seconds),
             monitored_system_unit_names=args.monitored_system_unit_names or [],
+            controlled_system_unit_names=args.controlled_system_unit_names or [],
         )
     )

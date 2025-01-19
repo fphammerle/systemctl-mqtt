@@ -32,7 +32,7 @@ import systemctl_mqtt
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
-@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_port", [1883])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "system/command"])
 @pytest.mark.parametrize("homeassistant_discovery_prefix", ["homeassistant"])
 @pytest.mark.parametrize("homeassistant_discovery_object_id", ["host", "node"])
@@ -67,6 +67,7 @@ async def test__run(
             homeassistant_discovery_object_id=homeassistant_discovery_object_id,
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     assert caplog.records[0].levelno == logging.INFO
     assert caplog.records[0].message == (
@@ -171,6 +172,7 @@ async def test__run_tls(caplog, mqtt_host, mqtt_port, mqtt_disable_tls):
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
@@ -198,7 +200,7 @@ async def test__run_tls_default():
     ) as dbus_signal_loop_mock:
         await systemctl_mqtt._run(
             mqtt_host="mqtt-broker.local",
-            mqtt_port=1833,
+            mqtt_port=1883,
             # mqtt_disable_tls default,
             mqtt_username=None,
             mqtt_password=None,
@@ -207,6 +209,7 @@ async def test__run_tls_default():
             homeassistant_discovery_object_id="host",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     # enabled by default
@@ -218,7 +221,7 @@ async def test__run_tls_default():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
-@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_port", [1883])
 @pytest.mark.parametrize("mqtt_username", ["me"])
 @pytest.mark.parametrize("mqtt_password", [None, "secret"])
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
@@ -240,6 +243,7 @@ async def test__run_authentication(
             homeassistant_discovery_object_id="node-id",
             poweroff_delay=datetime.timedelta(),
             monitored_system_unit_names=[],
+            controlled_system_unit_names=[],
         )
     mqtt_client_class_mock.assert_called_once()
     _, mqtt_client_init_kwargs = mqtt_client_class_mock.call_args
@@ -253,7 +257,7 @@ async def test__run_authentication(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mqtt_host", ["mqtt-broker.local"])
-@pytest.mark.parametrize("mqtt_port", [1833])
+@pytest.mark.parametrize("mqtt_port", [1883])
 @pytest.mark.parametrize("mqtt_password", ["secret"])
 async def test__run_authentication_missing_username(
     mqtt_host: str, mqtt_port: int, mqtt_password: str
@@ -272,6 +276,7 @@ async def test__run_authentication_missing_username(
                 homeassistant_discovery_object_id="node-id",
                 poweroff_delay=datetime.timedelta(),
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
     dbus_signal_loop_mock.assert_not_called()
 
@@ -301,6 +306,7 @@ async def test__run_sigint(mqtt_topic_prefix: str):
                 homeassistant_discovery_object_id="host",
                 poweroff_delay=datetime.timedelta(),
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
     async with mqtt_client_class_mock() as mqtt_client_mock:
         pass
@@ -334,6 +340,7 @@ async def test__mqtt_message_loop_trigger_poweroff(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     mqtt_client_mock.messages.__aiter__.return_value = [
@@ -382,6 +389,7 @@ async def test__mqtt_message_loop_retained(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     mqtt_client_mock.messages.__aiter__.return_value = [
@@ -423,8 +431,56 @@ def test_state_get_system_unit_active_state_mqtt_topic(
         homeassistant_discovery_object_id="whatever",
         poweroff_delay=datetime.timedelta(seconds=21),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     assert (
         state.get_system_unit_active_state_mqtt_topic(unit_name=unit_name)
         == f"{mqtt_topic_prefix}/unit/system/{unit_name}/active-state"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine '_dbus_signal_loop' was never awaited")
+@pytest.mark.filterwarnings("ignore:coroutine '_mqtt_message_loop' was never awaited")
+@pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
+@pytest.mark.parametrize("unit_name", ["foo.service", "bar.service"])
+async def test__mqtt_message_loop_trigger_restart(
+    caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str, unit_name: str
+) -> None:
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
+        monitored_system_unit_names=[],
+        controlled_system_unit_names=[unit_name],
+    )
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    topic = f"{mqtt_topic_prefix}/unit/system/{unit_name}/restart"
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic=topic,
+            payload=b"some-payload",
+            qos=0,
+            retain=False,
+            mid=42 // 2,
+            properties=None,
+        )
+    ]
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager.restart_unit"
+    ) as trigger_service_restart_mock, caplog.at_level(logging.DEBUG):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
+        )
+    assert unittest.mock.call(topic) in mqtt_client_mock.subscribe.await_args_list
+    trigger_service_restart_mock.assert_called_once_with(unit_name=unit_name)
+    assert [
+        t for t in caplog.record_tuples[2:] if not t[2].startswith("subscribing to ")
+    ] == [
+        (
+            "systemctl_mqtt",
+            logging.DEBUG,
+            f"received message on topic '{topic}': b'some-payload'",
+        ),
+    ]

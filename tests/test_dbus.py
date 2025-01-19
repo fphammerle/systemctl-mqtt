@@ -40,6 +40,12 @@ def test_get_login_manager_proxy():
     assert login_manager.CanPowerOff() in {("yes",), ("challenge",)}
 
 
+def test_get_service_manager_proxy():
+    service_manager = systemctl_mqtt._dbus.service_manager.get_service_manager_proxy()
+    assert isinstance(service_manager, jeepney.io.blocking.Proxy)
+    assert service_manager._msggen.interface == "org.freedesktop.systemd1.Manager"
+
+
 def test__log_shutdown_inhibitors_some(caplog):
     login_manager = unittest.mock.MagicMock()
     login_manager.ListInhibitors.return_value = (
@@ -386,6 +392,7 @@ async def test__dbus_signal_loop_unit() -> None:
         homeassistant_discovery_object_id="unused",
         poweroff_delay=datetime.timedelta(),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
     mqtt_client_mock = unittest.mock.AsyncMock()
     dbus_router_mock = unittest.mock.AsyncMock()

@@ -25,6 +25,7 @@ def test_poweroff_trigger(delay):
                 homeassistant_discovery_object_id="node",
                 poweroff_delay=delay,
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
         )
     schedule_shutdown_mock.assert_called_once_with(action="poweroff", delay=delay)
@@ -47,6 +48,7 @@ def test_mqtt_topic_suffix_action_mapping_poweroff(topic_suffix, expected_action
                 homeassistant_discovery_object_id="node",
                 poweroff_delay=datetime.timedelta(),
                 monitored_system_unit_names=[],
+                controlled_system_unit_names=[],
             )
         )
     login_manager_mock.ScheduleShutdown.assert_called_once()

@@ -15,9 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 import jeepney
-
 import systemctl_mqtt._dbus
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ServiceManager(jeepney.MessageGenerator):
@@ -41,6 +43,17 @@ class ServiceManager(jeepney.MessageGenerator):
             remote_obj=self, method="GetUnit", signature="s", body=(name,)
         )
 
+    def RestartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self,
+            method="RestartUnit",
+            signature="ss",
+            body=(
+                name,
+                mode,
+            ),
+        )
+
 
 class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
     """
@@ -55,3 +68,24 @@ class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
         super().__init__(object_path=object_path, bus_name="org.freedesktop.systemd1")
 
     # pylint: disable=invalid-name
+
+
+def restart_unit(unit_name: str):
+    proxy = get_service_manager_proxy()
+    try:
+        proxy.RestartUnit(unit_name, "replace")
+        _LOGGER.debug("Restarting unit: %s", unit_name)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error("Failed to restart unit: %s because %s ", unit_name, exc.name)
+
+
+def get_service_manager_proxy() -> jeepney.io.blocking.Proxy:
+    # https://jeepney.readthedocs.io/en/latest/integrate.html
+    # https://gitlab.com/takluyver/jeepney/-/blob/master/examples/aio_notify.py
+    return jeepney.io.blocking.Proxy(
+        msggen=ServiceManager(),
+        connection=jeepney.io.blocking.open_dbus_connection(
+            bus="SYSTEM",
+        ),
+    )

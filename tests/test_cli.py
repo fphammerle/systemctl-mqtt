@@ -183,6 +183,7 @@ def test__main(
         homeassistant_discovery_object_id="systemctl-mqtt-hostname",
         poweroff_delay=datetime.timedelta(seconds=4),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
 
 
@@ -231,6 +232,7 @@ def test__main_password_file(tmpdir, password_file_content, expected_password):
         homeassistant_discovery_object_id="systemctl-mqtt-hostname",
         poweroff_delay=datetime.timedelta(seconds=4),
         monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
     )
 
 
