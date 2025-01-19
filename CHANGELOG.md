@@ -7,15 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [1.1.0] - 2025-01-19
+### Added
+- ability to restart system units using `--control_system_unit <unit_name>`
+  ([#180](https://github.com/fphammerle/systemctl-mqtt/pull/180)
+  by Hanspeter Gosteli (hanspeter.gosteli@gmail.com))
+
 ### Documentation
 - added systemd user service config for autostart
-  (https://github.com/fphammerle/systemctl-mqtt/issues/66)
-
-## Unreleased
-### Added
-- ability to restart system units using `--control_system_unit <unit_name>` as
-  by [#180](https://github.com/fphammerle/systemctl-mqtt/pull/180)
-  from Hanspeter Gosteli (hanspeter.gosteli@gmail.com)
+  ([#66](https://github.com/fphammerle/systemctl-mqtt/issues/66))
 
 ## [1.0.0] - 2025-01-04
 ### Added
