@@ -20,10 +20,18 @@ import unittest.mock
 import pytest
 import jeepney.io.asyncio
 import jeepney.low_level
+import typing
 
 import systemctl_mqtt
 
 # pylint: disable=protected-access
+
+
+class DBusErrorResponseMock(jeepney.wrappers.DBusErrorResponse):
+    # pylint: disable=missing-class-docstring,super-init-not-called
+    def __init__(self, name: str, data: typing.Any):
+        self.name = name
+        self.data = data
 
 
 @pytest.mark.asyncio
@@ -83,7 +91,9 @@ def test__restart_unit_method_call():
 
 def test_restart_unit_with_exception():
     mock_proxy = unittest.mock.MagicMock()
-    mock_proxy.RestartUnit.side_effect = Exception("DBus error")
+    mock_proxy.RestartUnit.side_effect = side_effect = DBusErrorResponseMock(
+        "DBus error", ("mocked",)
+    )
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager.get_service_manager_proxy",
         return_value=mock_proxy,
@@ -92,5 +102,5 @@ def test_restart_unit_with_exception():
     ) as mock_logger:
         systemctl_mqtt._dbus.service_manager.restart_unit("example.service")
         mock_logger.error.assert_called_once_with(
-            "Failed to restart unit: %s because %s", "example.service", "DBus error"
+            "Failed to restart unit: %s because %s ", "example.service", "DBus error"
         )
