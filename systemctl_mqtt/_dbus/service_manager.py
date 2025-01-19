@@ -67,7 +67,7 @@ def restart_unit(unit_name: str):
         proxy.RestartUnit(unit_name, "replace")
         _LOGGER.debug("Restarting unit: %s", unit_name)
     # pylint: disable=broad-exception-caught
-    except Exception as e:
+    except  jeepney.wrappers.DBusErrorResponse as e:
         _LOGGER.error("Failed to restart unit: %s because %s", unit_name, str(e))
 
 
