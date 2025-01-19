@@ -78,8 +78,5 @@ def get_service_manager_proxy() -> jeepney.io.blocking.Proxy:
         msggen=ServiceManager(),
         connection=jeepney.io.blocking.open_dbus_connection(
             bus="SYSTEM",
-            # > dbus-broker[…]: Peer :1.… is being disconnected as it does not
-            # . support receiving file descriptors it requested.
-            enable_fds=True,
         ),
     )
