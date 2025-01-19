@@ -269,10 +269,10 @@ class _MQTTActionRestartUnit(_MQTTAction):
     # pylint: disable=protected-access,too-few-public-methods
     def __init__(self, unit_name: str):
         self._unit_name = unit_name
+
     def trigger(self, state: _State) -> None:
-        systemctl_mqtt._dbus.service_manager.restart_unit(
-            unit_name=self._unit_name
-        )
+        systemctl_mqtt._dbus.service_manager.restart_unit(unit_name=self._unit_name)
+
 
 class _MQTTActionLockAllSessions(_MQTTAction):
     # pylint: disable=too-few-public-methods

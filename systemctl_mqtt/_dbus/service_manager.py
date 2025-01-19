@@ -21,6 +21,7 @@ import systemctl_mqtt._dbus
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class ServiceManager(jeepney.MessageGenerator):
     """
     https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
@@ -44,8 +45,15 @@ class ServiceManager(jeepney.MessageGenerator):
 
     def RestartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
         return jeepney.new_method_call(
-            remote_obj=self, method="RestartUnit", signature="ss", body=(name,mode,)
+            remote_obj=self,
+            method="RestartUnit",
+            signature="ss",
+            body=(
+                name,
+                mode,
+            ),
         )
+
 
 class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
     """
@@ -61,13 +69,14 @@ class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
 
     # pylint: disable=invalid-name
 
+
 def restart_unit(unit_name: str):
     proxy = get_service_manager_proxy()
     try:
         proxy.RestartUnit(unit_name, "replace")
         _LOGGER.debug("Restarting unit: %s", unit_name)
     # pylint: disable=broad-exception-caught
-    except  jeepney.wrappers.DBusErrorResponse as e:
+    except jeepney.wrappers.DBusErrorResponse as e:
         _LOGGER.error("Failed to restart unit: %s because %s", unit_name, str(e))
 
 

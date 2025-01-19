@@ -159,11 +159,14 @@ async def test_publish_preparing_for_shutdown_get_fail(caplog):
 @pytest.mark.parametrize("object_id", ["raspberrypi", "debian21"])
 @pytest.mark.parametrize("hostname", ["hostname", "host-name"])
 @pytest.mark.parametrize(
-    ("monitored_system_unit_names",  "controlled_system_unit_names"),
+    ("monitored_system_unit_names", "controlled_system_unit_names"),
     [
-      ([], []),
-      (["foo.service", "bar.service"], ["foo-control.service", "bar-control.service"]),
-    ]
+        ([], []),
+        (
+            ["foo.service", "bar.service"],
+            ["foo-control.service", "bar-control.service"],
+        ),
+    ],
 )
 async def test_publish_homeassistant_device_config(
     # pylint: disable=too-many-arguments,too-many-positional-arguments
