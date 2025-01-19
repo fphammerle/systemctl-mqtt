@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import typing
 import unittest.mock
 
 import pytest
 import jeepney.io.asyncio
 import jeepney.low_level
-import typing
 
 import systemctl_mqtt
 
@@ -91,7 +91,7 @@ def test__restart_unit_method_call():
 
 def test_restart_unit_with_exception():
     mock_proxy = unittest.mock.MagicMock()
-    mock_proxy.RestartUnit.side_effect = side_effect = DBusErrorResponseMock(
+    mock_proxy.RestartUnit.side_effect = DBusErrorResponseMock(
         "DBus error", ("mocked",)
     )
     with unittest.mock.patch(
