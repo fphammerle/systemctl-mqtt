@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+print("nathan's version")
+
 import abc
 import argparse
 import asyncio
@@ -397,7 +399,7 @@ async def _dbus_signal_loop_unit(  # pylint: disable=too-many-arguments
             )
             if current_active_state != last_active_state:
                 await mqtt_client.publish(
-                    topic=active_state_topic, payload=current_active_state
+                    topic=active_state_topic, payload=current_active_state, retain=True
                 )
                 last_active_state = current_active_state
             queue.task_done()
@@ -491,6 +493,13 @@ async def _run(  # pylint: disable=too-many-arguments
         await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
         await state.publish_preparing_for_shutdown(mqtt_client=mqtt_client)
         try:
+            # Clear unit/system. Prevents retained messages getting "stuck" if command changes
+            await mqtt_client.publish(
+                topic=state.mqtt_topic_prefix + "/unit/system/",
+                payload="",
+                retain=True,
+            )
+            
             await mqtt_client.publish(
                 topic=state.mqtt_availability_topic,
                 payload=_MQTT_PAYLOAD_AVAILABLE,
