@@ -19,7 +19,7 @@ import pathlib
 
 import setuptools
 
-_REPO_URL = "https://github.com/fphammerle/systemctl-mqtt"
+_REPO_URL = "https://github.com/avrovulcanxh607/systemctl-mqtt"
 
 setuptools.setup(
     name="systemctl-mqtt",
