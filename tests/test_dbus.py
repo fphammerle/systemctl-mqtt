@@ -426,7 +426,7 @@ async def test__dbus_signal_loop_unit() -> None:
             dbus_router=dbus_router_mock,
             bus_proxy=bus_proxy_mock,
             unit_name="foo.service",
-            unit_path="/org/freedesktop/systemd1/unit/whatever.service",
+            unit_path="/org/freedesktop/systemd1/unit/whatever_2eservice",
         )
     )
 
