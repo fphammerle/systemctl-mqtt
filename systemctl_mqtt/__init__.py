@@ -509,13 +509,6 @@ async def _run(  # pylint: disable=too-many-arguments
                 payload=_MQTT_PAYLOAD_NOT_AVAILABLE,
                 retain=True,
             )
-            
-            for monitored_system_unit in state.monitored_system_unit_names:
-                await mqtt_client.publish(
-                    topic=state.get_system_unit_active_state_mqtt_topic(unit_name=monitored_system_unit),
-                    payload="unknown",
-                    retain=True,
-                )
 
 
 def _main() -> None:
