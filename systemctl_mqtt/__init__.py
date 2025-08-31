@@ -93,6 +93,12 @@ class _State:
     def get_system_unit_active_state_mqtt_topic(self, *, unit_name: str) -> str:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/active-state"
 
+    def get_system_unit_start_mqtt_topic(self, *, unit_name: str) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/start"
+
+    def get_system_unit_stop_mqtt_topic(self, *, unit_name: str) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/stop"
+
     def get_system_unit_restart_mqtt_topic(self, *, unit_name: str) -> str:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
 
@@ -232,6 +238,24 @@ class _State:
                 ),
             }
         for unit_name in self._controlled_system_unit_names:
+            config["components"]["unit/system/" + unit_name + "/start"] = {  # type: ignore
+                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-start",
+                "object_id": f"{hostname}_unit_system_{unit_name}_start",
+                "name": f"{unit_name} start",
+                "platform": "button",
+                "command_topic": self.get_system_unit_start_mqtt_topic(
+                    unit_name=unit_name
+                ),
+            }
+            config["components"]["unit/system/" + unit_name + "/stop"] = {  # type: ignore
+                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-stop",
+                "object_id": f"{hostname}_unit_system_{unit_name}_stop",
+                "name": f"{unit_name} stop",
+                "platform": "button",
+                "command_topic": self.get_system_unit_stop_mqtt_topic(
+                    unit_name=unit_name
+                ),
+            }
             config["components"]["unit/system/" + unit_name + "/restart"] = {  # type: ignore
                 "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-restart",
                 "object_id": f"{hostname}_unit_system_{unit_name}_restart",
@@ -263,6 +287,24 @@ class _MQTTActionSchedulePoweroff(_MQTTAction):
         systemctl_mqtt._dbus.login_manager.schedule_shutdown(
             action="poweroff", delay=state.poweroff_delay
         )
+
+
+class _MQTTActionStartUnit(_MQTTAction):
+    # pylint: disable=protected-access,too-few-public-methods
+    def __init__(self, unit_name: str):
+        self._unit_name = unit_name
+
+    def trigger(self, state: _State) -> None:
+        systemctl_mqtt._dbus.service_manager.start_unit(unit_name=self._unit_name)
+
+
+class _MQTTActionStopUnit(_MQTTAction):
+    # pylint: disable=protected-access,too-few-public-methods
+    def __init__(self, unit_name: str):
+        self._unit_name = unit_name
+
+    def trigger(self, state: _State) -> None:
+        systemctl_mqtt._dbus.service_manager.stop_unit(unit_name=self._unit_name)
 
 
 class _MQTTActionRestartUnit(_MQTTAction):
@@ -304,6 +346,18 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         action_by_topic[topic] = action
 
     for unit_name in state.controlled_system_unit_names:
+        topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/start"
+        _LOGGER.info("subscribing to %s", topic)
+        await mqtt_client.subscribe(topic)
+        action = _MQTTActionStartUnit(unit_name=unit_name)
+        action_by_topic[topic] = action
+
+        topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/stop"
+        _LOGGER.info("subscribing to %s", topic)
+        await mqtt_client.subscribe(topic)
+        action = _MQTTActionStopUnit(unit_name=unit_name)
+        action_by_topic[topic] = action
+
         topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
         _LOGGER.info("subscribing to %s", topic)
         await mqtt_client.subscribe(topic)
