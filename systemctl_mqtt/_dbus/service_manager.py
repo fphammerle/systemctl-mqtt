@@ -43,6 +43,28 @@ class ServiceManager(jeepney.MessageGenerator):
             remote_obj=self, method="GetUnit", signature="s", body=(name,)
         )
 
+    def StartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self,
+            method="StartUnit",
+            signature="ss",
+            body=(
+                name,
+                mode,
+            ),
+        )
+
+    def StopUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self,
+            method="StopUnit",
+            signature="ss",
+            body=(
+                name,
+                mode,
+            ),
+        )
+
     def RestartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
         return jeepney.new_method_call(
             remote_obj=self,
@@ -68,6 +90,26 @@ class Unit(systemctl_mqtt._dbus.Properties):  # pylint: disable=protected-access
         super().__init__(object_path=object_path, bus_name="org.freedesktop.systemd1")
 
     # pylint: disable=invalid-name
+
+
+def start_unit(unit_name: str):
+    proxy = get_service_manager_proxy()
+    try:
+        proxy.StartUnit(unit_name, "replace")
+        _LOGGER.debug("Starting unit: %s", unit_name)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error("Failed to start unit: %s because %s ", unit_name, exc.name)
+
+
+def stop_unit(unit_name: str):
+    proxy = get_service_manager_proxy()
+    try:
+        proxy.StopUnit(unit_name, "replace")
+        _LOGGER.debug("Stopping unit: %s", unit_name)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error("Failed to stop unit: %s because %s ", unit_name, exc.name)
 
 
 def restart_unit(unit_name: str):
