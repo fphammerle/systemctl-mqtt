@@ -252,13 +252,14 @@ async def test_publish_homeassistant_device_config(
             for n in monitored_system_unit_names
         }
         | {
-            f"unit/system/{n}/restart": {
-                "unique_id": f"systemctl-mqtt-{hostname}-unit-system-{n}-restart",
-                "object_id": f"{hostname}_unit_system_{n}_restart",
-                "name": f"{n} restart",
+            f"unit/system/{n}/{action}": {
+                "unique_id": f"systemctl-mqtt-{hostname}-unit-system-{n}-{action}",
+                "object_id": f"{hostname}_unit_system_{n}_{action}",
+                "name": f"{n} {action}",
                 "platform": "button",
-                "command_topic": f"{topic_prefix}/unit/system/{n}/restart",
+                "command_topic": f"{topic_prefix}/unit/system/{n}/{action}",
             }
             for n in controlled_system_unit_names
+            for action in ["restart", "start", "stop"]
         },
     }
