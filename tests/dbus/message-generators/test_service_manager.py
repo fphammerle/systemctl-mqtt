@@ -64,43 +64,59 @@ async def test__get_unit_path() -> None:
     assert msg.body == ("ssh.service",)
     assert not send_kwargs
 
-
-def test__restart_unit_proxy():
+@pytest.mark.parametrize("action,method", [
+    ("start", "StartUnit"),
+    ("stop", "StopUnit"),
+    ("restart", "RestartUnit"),
+])
+def test__unit_proxy(action, method):
     mock_proxy = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager.get_service_manager_proxy",
         return_value=mock_proxy,
     ):
-        systemctl_mqtt._dbus.service_manager.restart_unit("foo.service")
-        mock_proxy.RestartUnit.assert_called_once_with("foo.service", "replace")
+        # call the wrapper function dynamically
+        getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")("foo.service")
+        getattr(mock_proxy, method).assert_called_once_with("foo.service", "replace")
 
-
-def test__restart_unit_method_call():
+@pytest.mark.parametrize("action,method", [
+    ("start", "StartUnit"),
+    ("stop", "StopUnit"),
+    ("restart", "RestartUnit"),
+])
+def test__unit_method_call(action, method):
     with unittest.mock.patch(
         "jeepney.new_method_call", return_value=unittest.mock.MagicMock()
     ) as mock_method_call:
-        service_manager = systemctl_mqtt._dbus.service_manager.ServiceManager()
-        service_manager.RestartUnit("foo.service", "replace")
+        mgr = systemctl_mqtt._dbus.service_manager.ServiceManager()
+        getattr(mgr, method)("foo.service", "replace")
         mock_method_call.assert_called_once_with(
-            remote_obj=service_manager,
-            method="RestartUnit",
+            remote_obj=mgr,
+            method=method,
             signature="ss",
             body=("foo.service", "replace"),
         )
 
-
-def test_restart_unit_with_exception():
+@pytest.mark.parametrize("action,method", [
+    ("start", "StartUnit"),
+    ("stop", "StopUnit"),
+    ("restart", "RestartUnit"),
+])
+def test__unit_with_exception(action, method):
     mock_proxy = unittest.mock.MagicMock()
-    mock_proxy.RestartUnit.side_effect = DBusErrorResponseMock(
+    getattr(mock_proxy, method).side_effect = DBusErrorResponseMock(
         "DBus error", ("mocked",)
     )
+
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager.get_service_manager_proxy",
         return_value=mock_proxy,
     ), unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager._LOGGER"
     ) as mock_logger:
-        systemctl_mqtt._dbus.service_manager.restart_unit("example.service")
+        getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")("example.service")
         mock_logger.error.assert_called_once_with(
-            "Failed to restart unit: %s because %s ", "example.service", "DBus error"
+            f"Failed to {action} unit: %s because %s ",
+            "example.service",
+            "DBus error",
         )
