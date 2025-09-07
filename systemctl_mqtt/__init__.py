@@ -346,8 +346,18 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
         action_by_topic[topic] = action
 
     for unit_name in state.controlled_system_unit_names:
-        for topic_suffix, action_class in [('start', _MQTTActionStartUnit), ('stop', _MQTTActionStopUnit), ('restart', _MQTTActionRestartUnit)]:
-            topic = state.mqtt_topic_prefix + "/unit/system/" + unit_name + "/" + topic_suffix
+        for topic_suffix, action_class in [
+            ("start", _MQTTActionStartUnit),
+            ("stop", _MQTTActionStopUnit),
+            ("restart", _MQTTActionRestartUnit),
+        ]:
+            topic = (
+                state.mqtt_topic_prefix
+                + "/unit/system/"
+                + unit_name
+                + "/"
+                + topic_suffix
+            )
             _LOGGER.info("subscribing to %s", topic)
             await mqtt_client.subscribe(topic)
             action_by_topic[topic] = action_class(unit_name=unit_name)

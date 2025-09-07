@@ -64,11 +64,15 @@ async def test__get_unit_path() -> None:
     assert msg.body == ("ssh.service",)
     assert not send_kwargs
 
-@pytest.mark.parametrize("action,method", [
-    ("start", "StartUnit"),
-    ("stop", "StopUnit"),
-    ("restart", "RestartUnit"),
-])
+
+@pytest.mark.parametrize(
+    "action,method",
+    [
+        ("start", "StartUnit"),
+        ("stop", "StopUnit"),
+        ("restart", "RestartUnit"),
+    ],
+)
 def test__unit_proxy(action, method):
     mock_proxy = unittest.mock.MagicMock()
     with unittest.mock.patch(
@@ -79,12 +83,16 @@ def test__unit_proxy(action, method):
         getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")("foo.service")
         getattr(mock_proxy, method).assert_called_once_with("foo.service", "replace")
 
-@pytest.mark.parametrize("action,method", [
-    ("start", "StartUnit"),
-    ("stop", "StopUnit"),
-    ("restart", "RestartUnit"),
-])
-def test__unit_method_call(action, method):
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "StartUnit",
+        "StopUnit",
+        "RestartUnit",
+    ],
+)
+def test__unit_method_call(method):
     with unittest.mock.patch(
         "jeepney.new_method_call", return_value=unittest.mock.MagicMock()
     ) as mock_method_call:
@@ -97,11 +105,15 @@ def test__unit_method_call(action, method):
             body=("foo.service", "replace"),
         )
 
-@pytest.mark.parametrize("action,method", [
-    ("start", "StartUnit"),
-    ("stop", "StopUnit"),
-    ("restart", "RestartUnit"),
-])
+
+@pytest.mark.parametrize(
+    "action,method",
+    [
+        ("start", "StartUnit"),
+        ("stop", "StopUnit"),
+        ("restart", "RestartUnit"),
+    ],
+)
 def test__unit_with_exception(action, method):
     mock_proxy = unittest.mock.MagicMock()
     getattr(mock_proxy, method).side_effect = DBusErrorResponseMock(
@@ -114,7 +126,9 @@ def test__unit_with_exception(action, method):
     ), unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager._LOGGER"
     ) as mock_logger:
-        getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")("example.service")
+        getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")(
+            "example.service"
+        )
         mock_logger.error.assert_called_once_with(
             f"Failed to {action} unit: %s because %s ",
             "example.service",

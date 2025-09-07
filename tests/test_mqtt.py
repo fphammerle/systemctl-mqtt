@@ -446,7 +446,10 @@ def test_state_get_system_unit_active_state_mqtt_topic(
 @pytest.mark.parametrize("unit_name", ["foo.service", "bar.service"])
 @pytest.mark.parametrize("action", ["restart", "start", "stop"])
 async def test__mqtt_message_loop_triggers_unit_action(
-    caplog: pytest.LogCaptureFixture, mqtt_topic_prefix: str, unit_name: str, action: str
+    caplog: pytest.LogCaptureFixture,
+    mqtt_topic_prefix: str,
+    unit_name: str,
+    action: str,
 ) -> None:
     state = systemctl_mqtt._State(
         mqtt_topic_prefix=mqtt_topic_prefix,
