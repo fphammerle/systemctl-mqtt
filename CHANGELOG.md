@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## Added
 - support jeepney v0.9
+- ability to start/stop system units using `--control_system_unit <unit_name>`
+  ([#223](https://github.com/fphammerle/systemctl-mqtt/pull/223)
 
 ## [1.1.0] - 2025-01-19
 ### Added
