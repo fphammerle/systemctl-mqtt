@@ -62,9 +62,9 @@ def mock_open_dbus_connection() -> typing.Iterator[unittest.mock.MagicMock]:
 )
 def test_method(
     member: str,
-    signature: typing.Optional[str],
-    kwargs: typing.Dict[str, typing.Any],
-    body: typing.Tuple[typing.Any],
+    signature: str | None,
+    kwargs: dict[str, typing.Any],
+    body: tuple[typing.Any],
 ) -> None:
     with mock_open_dbus_connection() as dbus_connection_mock:
         proxy = systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()

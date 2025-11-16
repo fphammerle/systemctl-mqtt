@@ -316,7 +316,7 @@ async def _get_unit_path_mock(  # pylint: disable=unused-argument
 @pytest.mark.parametrize(
     "monitored_system_unit_names", [[], ["foo.service", "bar.service"]]
 )
-async def test__dbus_signal_loop(monitored_system_unit_names: typing.List[str]) -> None:
+async def test__dbus_signal_loop(monitored_system_unit_names: list[str]) -> None:
     # pylint: disable=too-many-locals,too-many-arguments
     state_mock = unittest.mock.AsyncMock()
     with unittest.mock.patch(

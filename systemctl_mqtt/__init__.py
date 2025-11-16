@@ -63,8 +63,8 @@ class _State:
         homeassistant_discovery_prefix: str,
         homeassistant_discovery_object_id: str,
         poweroff_delay: datetime.timedelta,
-        monitored_system_unit_names: typing.List[str],
-        controlled_system_unit_names: typing.List[str],
+        monitored_system_unit_names: list[str],
+        controlled_system_unit_names: list[str],
     ) -> None:
         self._mqtt_topic_prefix = mqtt_topic_prefix
         self._homeassistant_discovery_prefix = homeassistant_discovery_prefix
@@ -72,7 +72,7 @@ class _State:
         self._login_manager = (
             systemctl_mqtt._dbus.login_manager.get_login_manager_proxy()
         )
-        self._shutdown_lock: typing.Optional[jeepney.fds.FileDescriptor] = None
+        self._shutdown_lock: jeepney.fds.FileDescriptor | None = None
         self._shutdown_lock_mutex = threading.Lock()
         self.poweroff_delay = poweroff_delay
         self._monitored_system_unit_names = monitored_system_unit_names
@@ -103,11 +103,11 @@ class _State:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
 
     @property
-    def monitored_system_unit_names(self) -> typing.List[str]:
+    def monitored_system_unit_names(self) -> list[str]:
         return self._monitored_system_unit_names
 
     @property
-    def controlled_system_unit_names(self) -> typing.List[str]:
+    def controlled_system_unit_names(self) -> list[str]:
         return self._controlled_system_unit_names
 
     @property
@@ -338,7 +338,7 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
-    action_by_topic: typing.Dict[str, _MQTTAction] = {}
+    action_by_topic: dict[str, _MQTTAction] = {}
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
         _LOGGER.info("subscribing to %s", topic)
@@ -496,14 +496,14 @@ async def _run(  # pylint: disable=too-many-arguments
     *,
     mqtt_host: str,
     mqtt_port: int,
-    mqtt_username: typing.Optional[str],
-    mqtt_password: typing.Optional[str],
+    mqtt_username: str | None,
+    mqtt_password: str | None,
     mqtt_topic_prefix: str,
     homeassistant_discovery_prefix: str,
     homeassistant_discovery_object_id: str,
     poweroff_delay: datetime.timedelta,
-    monitored_system_unit_names: typing.List[str],
-    controlled_system_unit_names: typing.List[str],
+    monitored_system_unit_names: list[str],
+    controlled_system_unit_names: list[str],
     mqtt_disable_tls: bool = False,
 ) -> None:
     state = _State(

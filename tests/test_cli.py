@@ -17,7 +17,6 @@
 
 import datetime
 import logging
-import typing
 import unittest.mock
 
 import pytest
@@ -40,7 +39,7 @@ import systemctl_mqtt._utils
         (["--log-level", "critical"], logging.CRITICAL),
     ],
 )
-def test__main_log_level(args: typing.List[str], log_level: int) -> None:
+def test__main_log_level(args: list[str], log_level: int) -> None:
     with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(
         "sys.argv", ["", "--mqtt-host", "mqtt-broker.local"] + args
     ):
@@ -162,7 +161,7 @@ def test__main(
     expected_mqtt_disable_tls,
     expected_username,
     expected_password,
-    expected_topic_prefix: typing.Optional[str],
+    expected_topic_prefix: str | None,
 ):
     # pylint: disable=too-many-arguments
     with unittest.mock.patch("systemctl_mqtt._run") as run_mock, unittest.mock.patch(

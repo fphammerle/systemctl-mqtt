@@ -19,7 +19,6 @@ import datetime
 import getpass
 import json
 import logging
-import typing
 
 import jeepney
 import jeepney.io.blocking
@@ -32,7 +31,7 @@ _LOGIN_MANAGER_OBJECT_PATH = "/org/freedesktop/login1"
 _LOGIN_MANAGER_INTERFACE = "org.freedesktop.login1.Manager"
 
 
-def _get_username() -> typing.Optional[str]:
+def _get_username() -> str | None:
     try:
         return getpass.getuser()
     except OSError:

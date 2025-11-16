@@ -174,8 +174,8 @@ async def test_publish_homeassistant_device_config(
     discovery_prefix: str,
     object_id: str,
     hostname: str,
-    monitored_system_unit_names: typing.List[str],
-    controlled_system_unit_names: typing.List[str],
+    monitored_system_unit_names: list[str],
+    controlled_system_unit_names: list[str],
 ) -> None:
     with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection"):
         state = systemctl_mqtt._State(
