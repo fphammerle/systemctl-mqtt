@@ -100,8 +100,8 @@ enables reports on topic
 ```
 $ systemctl-mqtt  --control-system-unit <unit_name>
 ```
-enables that a system unit can be started, stopped, and restarted by a message on topic
-`systemctl/[hostname]/unit/system/[unit_name]/start`, `…/stop`, `…/restart`.
+enables that a system unit can be started, stopped, restarted and isolated by a message on topic
+`systemctl/[hostname]/unit/system/[unit_name]/start`, `…/stop`, `…/restart`, `…/isolate`.
 
 ## Home Assistant 🏡
 
