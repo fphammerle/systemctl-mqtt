@@ -444,7 +444,7 @@ def test_state_get_system_unit_active_state_mqtt_topic(
 @pytest.mark.filterwarnings("ignore:coroutine '_mqtt_message_loop' was never awaited")
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host"])
 @pytest.mark.parametrize("unit_name", ["foo.service", "bar.service"])
-@pytest.mark.parametrize("action", ["restart", "start", "stop"])
+@pytest.mark.parametrize("action", ["restart", "start", "stop", "isolate"])
 async def test__mqtt_message_loop_triggers_unit_action(
     caplog: pytest.LogCaptureFixture,
     mqtt_topic_prefix: str,
