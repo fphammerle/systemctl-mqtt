@@ -114,8 +114,15 @@ added automatically:
 - `button.[hostname]_logind_suspend`
 - `sensor.[hostname]_unit_system_[unit_name]_active_state`
   for `--monitor-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_start`
+  for `--control-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_stop`
+  for `--control-system-unit [unit_name]`
 - `button.[hostname]_unit_system_[unit_name]_restart`
   for `--control-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_isolate`
+  for `--control-system-unit [unit_name]`, when the unit allows isolation (e.g., targets).
+
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
 
