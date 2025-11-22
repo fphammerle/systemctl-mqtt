@@ -95,7 +95,7 @@ $ systemctl-mqtt --monitor-system-unit foo.service
 enables reports on topic
 `systemctl/[hostname]/unit/system/[unit_name]/active-state`.
 
-### Restarting of System Units
+### Control System Units
 
 ```
 $ systemctl-mqtt  --control-system-unit <unit_name>
@@ -121,7 +121,7 @@ added automatically:
 - `button.[hostname]_unit_system_[unit_name]_restart`
   for `--control-system-unit [unit_name]`
 - `button.[hostname]_unit_system_[unit_name]_isolate`
-  for `--control-system-unit [unit_name]`, when the unit allows isolation (e.g., targets).
+  for `--control-system-unit [unit_name]`, when the unit allows isolation (e.g., targets)
 
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
