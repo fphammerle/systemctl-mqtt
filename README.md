@@ -100,8 +100,8 @@ enables reports on topic
 ```
 $ systemctl-mqtt  --control-system-unit <unit_name>
 ```
-enables that a system unit can be started, stopped, and restarted by a message on topic
-`systemctl/[hostname]/unit/system/[unit_name]/start`, `…/stop`, `…/restart`.
+enables that a system unit can be started, stopped, restarted and isolated by a message on topic
+`systemctl/[hostname]/unit/system/[unit_name]/start`, `…/stop`, `…/restart`, `…/isolate`.
 
 ## Home Assistant 🏡
 
@@ -114,8 +114,15 @@ added automatically:
 - `button.[hostname]_logind_suspend`
 - `sensor.[hostname]_unit_system_[unit_name]_active_state`
   for `--monitor-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_start`
+  for `--control-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_stop`
+  for `--control-system-unit [unit_name]`
 - `button.[hostname]_unit_system_[unit_name]_restart`
   for `--control-system-unit [unit_name]`
+- `button.[hostname]_unit_system_[unit_name]_isolate`
+  for `--control-system-unit [unit_name]`, when the unit allows isolation (e.g., targets).
+
 
 ![homeassistant entities_over_auto_discovery](docs/homeassistant/entities-after-auto-discovery.png)
 

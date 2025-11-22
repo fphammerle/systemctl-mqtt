@@ -43,6 +43,11 @@ class ServiceManager(jeepney.MessageGenerator):
             remote_obj=self, method="GetUnit", signature="s", body=(name,)
         )
 
+    def LoadUnit(self, name: str) -> jeepney.low_level.Message:
+        return jeepney.new_method_call(
+            remote_obj=self, method="LoadUnit", signature="s", body=(name,)
+        )
+
     def StartUnit(self, name: str, mode: str) -> jeepney.low_level.Message:
         return jeepney.new_method_call(
             remote_obj=self,
@@ -122,12 +127,55 @@ def restart_unit(unit_name: str):
         _LOGGER.error("Failed to restart unit: %s because %s ", unit_name, exc.name)
 
 
+def isolate_unit(unit_name: str):
+    proxy = get_service_manager_proxy()
+    try:
+        proxy.StartUnit(unit_name, "isolate")
+        _LOGGER.debug("Isolating unit: %s", unit_name)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error("Failed to isolate unit: %s because %s ", unit_name, exc.name)
+
+
+def is_isolate_unit_allowed(unit_name: str) -> bool:
+    if (unit_proxy := _get_unit_proxy(unit_name=unit_name)) is None:
+        return False
+
+    try:
+        ((_, allowed),) = unit_proxy.Get("AllowIsolate")
+        _LOGGER.debug("AllowIsolate for %s = %s", unit_name, allowed)
+        return bool(allowed)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error(
+            "Failed to get AllowIsolate property of unit %s because %s",
+            unit_name,
+            exc.name,
+        )
+        return False
+
+
+def _get_connection() -> jeepney.io.blocking.DBusConnection:
+    return jeepney.io.blocking.open_dbus_connection(bus="SYSTEM")
+
+
+def _get_unit_proxy(unit_name: str) -> jeepney.io.blocking.Proxy | None:
+    connection = _get_connection()
+    proxy = jeepney.io.blocking.Proxy(msggen=ServiceManager(), connection=connection)
+    try:
+        (unit_path,) = proxy.LoadUnit(name=unit_name)
+    # pylint: disable=broad-exception-caught
+    except jeepney.wrappers.DBusErrorResponse as exc:
+        _LOGGER.error("Failed to load unit: %s because %s", unit_name, exc.name)
+        return None
+    return jeepney.io.blocking.Proxy(
+        msggen=Unit(object_path=unit_path), connection=connection
+    )
+
+
 def get_service_manager_proxy() -> jeepney.io.blocking.Proxy:
     # https://jeepney.readthedocs.io/en/latest/integrate.html
     # https://gitlab.com/takluyver/jeepney/-/blob/master/examples/aio_notify.py
     return jeepney.io.blocking.Proxy(
-        msggen=ServiceManager(),
-        connection=jeepney.io.blocking.open_dbus_connection(
-            bus="SYSTEM",
-        ),
+        msggen=ServiceManager(), connection=_get_connection()
     )

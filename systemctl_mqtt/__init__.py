@@ -93,14 +93,10 @@ class _State:
     def get_system_unit_active_state_mqtt_topic(self, *, unit_name: str) -> str:
         return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/active-state"
 
-    def get_system_unit_start_mqtt_topic(self, *, unit_name: str) -> str:
-        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/start"
-
-    def get_system_unit_stop_mqtt_topic(self, *, unit_name: str) -> str:
-        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/stop"
-
-    def get_system_unit_restart_mqtt_topic(self, *, unit_name: str) -> str:
-        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/restart"
+    def get_system_unit_action_mqtt_topic(
+        self, *, unit_name: str, action_name: str
+    ) -> str:
+        return self._mqtt_topic_prefix + "/unit/system/" + unit_name + "/" + action_name
 
     @property
     def monitored_system_unit_names(self) -> list[str]:
@@ -238,33 +234,24 @@ class _State:
                 ),
             }
         for unit_name in self._controlled_system_unit_names:
-            config["components"]["unit/system/" + unit_name + "/start"] = {  # type: ignore
-                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-start",
-                "object_id": f"{hostname}_unit_system_{unit_name}_start",
-                "name": f"{unit_name} start",
-                "platform": "button",
-                "command_topic": self.get_system_unit_start_mqtt_topic(
-                    unit_name=unit_name
-                ),
-            }
-            config["components"]["unit/system/" + unit_name + "/stop"] = {  # type: ignore
-                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-stop",
-                "object_id": f"{hostname}_unit_system_{unit_name}_stop",
-                "name": f"{unit_name} stop",
-                "platform": "button",
-                "command_topic": self.get_system_unit_stop_mqtt_topic(
-                    unit_name=unit_name
-                ),
-            }
-            config["components"]["unit/system/" + unit_name + "/restart"] = {  # type: ignore
-                "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-restart",
-                "object_id": f"{hostname}_unit_system_{unit_name}_restart",
-                "name": f"{unit_name} restart",
-                "platform": "button",
-                "command_topic": self.get_system_unit_restart_mqtt_topic(
-                    unit_name=unit_name
-                ),
-            }
+            component_prefix = "unit/system/" + unit_name
+            for action_name, action_class in [
+                ("start", _MQTTActionStartUnit),
+                ("stop", _MQTTActionStopUnit),
+                ("restart", _MQTTActionRestartUnit),
+                ("isolate", _MQTTActionIsolateUnit),
+            ]:
+                if action_class(unit_name).is_allowed():
+                    config["components"][component_prefix + "/" + action_name] = {  # type: ignore
+                        "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-{action_name}",
+                        "object_id": f"{hostname}_unit_system_{unit_name}_{action_name}",
+                        "name": f"{unit_name} {action_name}",
+                        "platform": "button",
+                        "command_topic": self.get_system_unit_action_mqtt_topic(
+                            unit_name=unit_name, action_name=action_name
+                        ),
+                    }
+
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         await mqtt_client.publish(
             topic=discovery_topic, payload=json.dumps(config), retain=False
@@ -272,6 +259,9 @@ class _State:
 
 
 class _MQTTAction(metaclass=abc.ABCMeta):
+    def is_allowed(self) -> bool:
+        return True
+
     @abc.abstractmethod
     def trigger(self, state: _State) -> None:
         pass  # pragma: no cover
@@ -316,6 +306,20 @@ class _MQTTActionRestartUnit(_MQTTAction):
         systemctl_mqtt._dbus.service_manager.restart_unit(unit_name=self._unit_name)
 
 
+class _MQTTActionIsolateUnit(_MQTTAction):
+    # pylint: disable=protected-access,too-few-public-methods
+    def __init__(self, unit_name: str):
+        self._unit_name = unit_name
+
+    def is_allowed(self) -> bool:
+        return systemctl_mqtt._dbus.service_manager.is_isolate_unit_allowed(
+            unit_name=self._unit_name
+        )
+
+    def trigger(self, state: _State) -> None:
+        systemctl_mqtt._dbus.service_manager.isolate_unit(unit_name=self._unit_name)
+
+
 class _MQTTActionLockAllSessions(_MQTTAction):
     # pylint: disable=too-few-public-methods
     def trigger(self, state: _State) -> None:
@@ -350,6 +354,7 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
             ("start", _MQTTActionStartUnit),
             ("stop", _MQTTActionStopUnit),
             ("restart", _MQTTActionRestartUnit),
+            ("isolate", _MQTTActionIsolateUnit),
         ]:
             topic = (
                 state.mqtt_topic_prefix

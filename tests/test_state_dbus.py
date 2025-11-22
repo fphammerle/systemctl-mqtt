@@ -263,3 +263,43 @@ async def test_publish_homeassistant_device_config(
             for action in ["restart", "start", "stop"]
         },
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("is_allowed", [True, False])
+@pytest.mark.parametrize(
+    ("action_cls", "action_name"),
+    [
+        (systemctl_mqtt._MQTTActionStartUnit, "start"),
+        (systemctl_mqtt._MQTTActionStopUnit, "stop"),
+        (systemctl_mqtt._MQTTActionRestartUnit, "restart"),
+        (systemctl_mqtt._MQTTActionIsolateUnit, "isolate"),
+    ],
+)
+async def test_publish_homeassistant_device_config_filter(
+    action_cls: systemctl_mqtt._MQTTAction,
+    action_name: str,
+    is_allowed: bool,
+) -> None:
+    mqtt_client = unittest.mock.AsyncMock()
+    with unittest.mock.patch("jeepney.io.blocking.open_dbus_connection"):
+        state = systemctl_mqtt._State(
+            mqtt_topic_prefix="topic",
+            homeassistant_discovery_prefix="homeassistant",
+            homeassistant_discovery_object_id="obj",
+            poweroff_delay=datetime.timedelta(),
+            monitored_system_unit_names=[],
+            controlled_system_unit_names=["foo.service"],
+        )
+    with unittest.mock.patch(
+        "systemctl_mqtt._utils.get_hostname", return_value="host"
+    ), unittest.mock.patch.object(action_cls, "is_allowed", return_value=is_allowed):
+        await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
+
+    mqtt_client.publish.assert_awaited_once()
+    _, publish_kwargs = mqtt_client.publish.call_args
+    config = json.loads(publish_kwargs["payload"])
+
+    assert (
+        f"unit/system/foo.service/{action_name}" in config["components"]
+    ) == is_allowed

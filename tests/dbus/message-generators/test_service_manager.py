@@ -65,15 +65,102 @@ async def test__get_unit_path() -> None:
     assert not send_kwargs
 
 
+def test__get_unit_proxy():
+    unit_proxy = unittest.mock.MagicMock()
+    manager_proxy = unittest.mock.MagicMock()
+    manager_proxy.LoadUnit.return_value = ("/unit/foo",)
+
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager._get_connection", return_value=object()
+    ), unittest.mock.patch(
+        "jeepney.io.blocking.Proxy", side_effect=(manager_proxy, unit_proxy)
+    ):
+        assert (
+            systemctl_mqtt._dbus.service_manager._get_unit_proxy("foo.service")
+            is unit_proxy
+        )
+
+    manager_proxy.LoadUnit.assert_called_once_with(name="foo.service")
+
+
 @pytest.mark.parametrize(
-    "action,method",
+    ("function_name", "property_name", "propery_value", "return_value"),
     [
-        ("start", "StartUnit"),
-        ("stop", "StopUnit"),
-        ("restart", "RestartUnit"),
+        ("is_isolate_unit_allowed", "AllowIsolate", True, True),
+        ("is_isolate_unit_allowed", "AllowIsolate", False, False),
     ],
 )
-def test__unit_proxy(action, method):
+def test__unit_property(function_name, property_name, propery_value, return_value):
+    mock_unit_proxy = unittest.mock.MagicMock()
+    mock_unit_proxy.Get.return_value = ((None, propery_value),)
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager._get_unit_proxy",
+        return_value=mock_unit_proxy,
+    ):
+        # call the wrapper function dynamically
+        assert (
+            getattr(systemctl_mqtt._dbus.service_manager, function_name)("foo.service")
+            is return_value
+        )
+        mock_unit_proxy.Get.assert_called_once_with(property_name)
+
+
+@pytest.mark.parametrize(
+    "function_name",
+    ["is_isolate_unit_allowed"],
+)
+def test__unit_property_with_exception_on_load_unit(function_name):
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager.ServiceManager.LoadUnit",
+        side_effect=DBusErrorResponseMock("DBus error", ("mocked",)),
+    ), unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager._LOGGER"
+    ) as mock_logger:
+        assert (
+            getattr(systemctl_mqtt._dbus.service_manager, function_name)("foo.service")
+            is False
+        )
+        mock_logger.error.assert_called_once_with(
+            "Failed to load unit: %s because %s",
+            "foo.service",
+            "DBus error",
+        )
+
+
+@pytest.mark.parametrize(
+    ("function_name", "property_name"),
+    [("is_isolate_unit_allowed", "AllowIsolate")],
+)
+def test__unit_property_with_exception_on_get(function_name, property_name):
+    mock_proxy = unittest.mock.MagicMock()
+    mock_proxy.Get.side_effect = DBusErrorResponseMock("DBus error", ("mocked",))
+    with unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager._get_unit_proxy",
+        return_value=mock_proxy,
+    ), unittest.mock.patch(
+        "systemctl_mqtt._dbus.service_manager._LOGGER"
+    ) as mock_logger:
+        assert (
+            getattr(systemctl_mqtt._dbus.service_manager, function_name)("foo.service")
+            is False
+        )
+        mock_logger.error.assert_called_once_with(
+            f"Failed to get {property_name} property of unit %s because %s",
+            "foo.service",
+            "DBus error",
+        )
+
+
+@pytest.mark.parametrize(
+    "action,method,mode",
+    [
+        ("start", "StartUnit", "replace"),
+        ("stop", "StopUnit", "replace"),
+        ("restart", "RestartUnit", "replace"),
+        ("isolate", "StartUnit", "isolate"),
+    ],
+)
+def test__unit_proxy(action, method, mode):
     mock_proxy = unittest.mock.MagicMock()
     with unittest.mock.patch(
         "systemctl_mqtt._dbus.service_manager.get_service_manager_proxy",
@@ -81,7 +168,7 @@ def test__unit_proxy(action, method):
     ):
         # call the wrapper function dynamically
         getattr(systemctl_mqtt._dbus.service_manager, f"{action}_unit")("foo.service")
-        getattr(mock_proxy, method).assert_called_once_with("foo.service", "replace")
+        getattr(mock_proxy, method).assert_called_once_with("foo.service", mode)
 
 
 @pytest.mark.parametrize(
@@ -112,6 +199,7 @@ def test__unit_method_call(method):
         ("start", "StartUnit"),
         ("stop", "StopUnit"),
         ("restart", "RestartUnit"),
+        ("isolate", "StartUnit"),
     ],
 )
 def test__unit_with_exception(action, method):
