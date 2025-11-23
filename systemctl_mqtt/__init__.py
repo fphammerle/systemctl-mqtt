@@ -46,6 +46,9 @@ _MQTT_DEFAULT_TLS_PORT = 8883
 # https://web.archive.org/web/20250101075341/https://www.home-assistant.io/integrations/sensor.mqtt/#payload_not_available
 _MQTT_PAYLOAD_NOT_AVAILABLE = "offline"
 _MQTT_PAYLOAD_AVAILABLE = "online"
+# https://www.home-assistant.io/integrations/mqtt/#birth-and-last-will-messages
+_HOMEASSISTANT_BIRTH_TOPIC = "homeassistant/status"
+_HOMEASSISTANT_BIRTH_PAYLOAD = b"online"
 _ARGUMENT_LOG_LEVEL_MAPPING = {
     a: getattr(logging, a.upper())
     for a in ("debug", "info", "warning", "error", "critical")
@@ -342,6 +345,9 @@ _MQTT_TOPIC_SUFFIX_ACTION_MAPPING = {
 
 
 async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> None:
+    _LOGGER.info("subscribing to %s", _HOMEASSISTANT_BIRTH_TOPIC)
+    await mqtt_client.subscribe(_HOMEASSISTANT_BIRTH_TOPIC)
+
     action_by_topic: dict[str, _MQTTAction] = {}
     for topic_suffix, action in _MQTT_TOPIC_SUFFIX_ACTION_MAPPING.items():
         topic = state.mqtt_topic_prefix + "/" + topic_suffix
@@ -370,6 +376,10 @@ async def _mqtt_message_loop(*, state: _State, mqtt_client: aiomqtt.Client) -> N
     async for message in mqtt_client.messages:
         if message.retain:
             _LOGGER.info("ignoring retained message on topic %r", message.topic.value)
+        elif message.topic.value == _HOMEASSISTANT_BIRTH_TOPIC:
+            _LOGGER.debug("received homeassistant status: %r", message.payload)
+            if message.payload == _HOMEASSISTANT_BIRTH_PAYLOAD:
+                await state.publish_homeassistant_device_config(mqtt_client=mqtt_client)
         else:
             _LOGGER.debug(
                 "received message on topic %r: %r", message.topic.value, message.payload

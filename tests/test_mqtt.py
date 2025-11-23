@@ -118,6 +118,7 @@ async def test__run(
         "retain": True,
     }
     assert sorted(mqtt_client_mock.subscribe.call_args_list) == [
+        unittest.mock.call("homeassistant/status"),
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
         unittest.mock.call(mqtt_topic_prefix + "/suspend"),
@@ -142,11 +143,12 @@ async def test__run(
         caplog.records[4].message
         == f"publishing 'false' on {mqtt_topic_prefix}/preparing-for-shutdown"
     )
-    assert all(r.levelno == logging.INFO for r in caplog.records[5::2])
-    assert {r.message for r in caplog.records[5:]} == {
+    assert all(r.levelno == logging.INFO for r in caplog.records[5:])
+    expected_subscription_messages = {
         f"subscribing to {mqtt_topic_prefix}/{s}"
         for s in ("poweroff", "lock-all-sessions", "suspend")
-    }
+    } | {"subscribing to homeassistant/status"}
+    assert {r.message for r in caplog.records[5:]} == expected_subscription_messages
     dbus_signal_loop_mock.assert_awaited_once()
 
 
@@ -360,6 +362,7 @@ async def test__mqtt_message_loop_trigger_poweroff(
             state=state, mqtt_client=mqtt_client_mock
         )
     assert sorted(mqtt_client_mock.subscribe.await_args_list) == [
+        unittest.mock.call("homeassistant/status"),
         unittest.mock.call(mqtt_topic_prefix + "/lock-all-sessions"),
         unittest.mock.call(mqtt_topic_prefix + "/poweroff"),
         unittest.mock.call(mqtt_topic_prefix + "/suspend"),
@@ -418,6 +421,74 @@ async def test__mqtt_message_loop_retained(
             "ignoring retained message on topic 'systemctl/host/poweroff'",
         ),
     ]
+
+
+@pytest.mark.asyncio
+async def test__mqtt_message_loop_homeassistant_status_online(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mqtt_topic_prefix = "systemctl/host"
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
+        monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
+    )
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic="homeassistant/status",
+            payload=b"online",
+            qos=0,
+            retain=False,
+            mid=1,
+            properties=None,
+        )
+    ]
+    with unittest.mock.patch.object(
+        state, "publish_homeassistant_device_config"
+    ) as publish_config_mock, caplog.at_level(logging.INFO):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
+        )
+    publish_config_mock.assert_awaited_once_with(mqtt_client=mqtt_client_mock)
+    assert (
+        unittest.mock.call("homeassistant/status")
+        in mqtt_client_mock.subscribe.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test__mqtt_message_loop_homeassistant_status_offline(caplog) -> None:
+    mqtt_topic_prefix = "systemctl/host"
+    state = systemctl_mqtt._State(
+        mqtt_topic_prefix=mqtt_topic_prefix,
+        homeassistant_discovery_prefix="homeassistant",
+        homeassistant_discovery_object_id="whatever",
+        poweroff_delay=datetime.timedelta(seconds=21),
+        monitored_system_unit_names=[],
+        controlled_system_unit_names=[],
+    )
+    mqtt_client_mock = unittest.mock.AsyncMock()
+    mqtt_client_mock.messages.__aiter__.return_value = [
+        aiomqtt.Message(
+            topic="homeassistant/status",
+            payload=b"offline",
+            qos=0,
+            retain=False,
+            mid=2,
+            properties=None,
+        )
+    ]
+    with unittest.mock.patch.object(
+        state, "publish_homeassistant_device_config"
+    ) as publish_config_mock, caplog.at_level(logging.DEBUG):
+        await systemctl_mqtt._mqtt_message_loop(
+            state=state, mqtt_client=mqtt_client_mock
+        )
+    publish_config_mock.assert_not_called()
 
 
 @pytest.mark.parametrize("mqtt_topic_prefix", ["systemctl/host", "systemd/raspberrypi"])
