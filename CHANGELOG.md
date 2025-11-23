@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add missing dbus rules for systemd Manager and Unit in apparmor profile.
   ([#244](https://github.com/fphammerle/systemctl-mqtt/pull/244)
   by Julien Frantz (julien.frantz@gmail.com))
+- publish Home Assistant device discovery config whenever Home Assistant sends
+  its birth message on startup.
+  ([#244](https://github.com/fphammerle/systemctl-mqtt/pull/244)
+  by Julien Frantz (julien.frantz@gmail.com))
 
 ## [2.0.0] - 2025-11-22
 ### Added
