@@ -146,7 +146,7 @@ class _State:
         # pylint: disable=protected-access
         payload = systemctl_mqtt._mqtt.encode_bool(active)
         _LOGGER.info("publishing %r on %s", payload, topic)
-        await mqtt_client.publish(topic=topic, payload=payload, retain=False)
+        await mqtt_client.publish(topic=topic, payload=payload, retain=True)
 
     async def preparing_for_shutdown_handler(
         self, active: bool, mqtt_client: aiomqtt.Client
@@ -257,7 +257,7 @@ class _State:
 
         _LOGGER.debug("publishing home assistant config on %s", discovery_topic)
         await mqtt_client.publish(
-            topic=discovery_topic, payload=json.dumps(config), retain=False
+            topic=discovery_topic, payload=json.dumps(config), retain=True
         )
 
 
@@ -455,7 +455,9 @@ async def _dbus_signal_loop_unit(  # pylint: disable=too-many-arguments
         unit_name=unit_name
     )
     ((_, last_active_state),) = await unit_proxy.Get(property_name="ActiveState")
-    await mqtt_client.publish(topic=active_state_topic, payload=last_active_state)
+    await mqtt_client.publish(
+        topic=active_state_topic, payload=last_active_state, retain=True
+    )
     with dbus_router.filter(unit_properties_changed_match_rule) as queue:
         while True:
             await queue.get()
@@ -464,7 +466,7 @@ async def _dbus_signal_loop_unit(  # pylint: disable=too-many-arguments
             )
             if current_active_state != last_active_state:
                 await mqtt_client.publish(
-                    topic=active_state_topic, payload=current_active_state
+                    topic=active_state_topic, payload=current_active_state, retain=True
                 )
                 last_active_state = current_active_state
             queue.task_done()
