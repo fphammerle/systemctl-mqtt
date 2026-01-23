@@ -142,9 +142,7 @@ polkit.addRule(function(action, subject) {
         return polkit.Result.YES;
     }
 });
-""".replace(
-                "{{username}}", getpass.getuser()
-            ),
+""".replace("{{username}}", getpass.getuser()),
         ),
         (
             "reboot",
@@ -158,9 +156,7 @@ polkit.addRule(function(action, subject) {
         return polkit.Result.YES;
     }
 });
-""".replace(
-                "{{username}}", getpass.getuser()
-            ),
+""".replace("{{username}}", getpass.getuser()),
         ),
     ],
 )
@@ -279,9 +275,7 @@ polkit.addRule(function(action, subject) {
         return polkit.Result.YES;
     }
 });
-""".replace(
-                "{{username}}", getpass.getuser()
-            ),
+""".replace("{{username}}", getpass.getuser()),
         ),
     ],
 )
@@ -437,7 +431,7 @@ async def test__dbus_signal_loop_unit() -> None:
     with pytest.raises(asyncio.exceptions.CancelledError):
         await asyncio.gather(*(loop_task, _abort_after_msg_queue()))
     bus_proxy_mock.AddMatch.assert_awaited_once()
-    ((match_rule,), add_match_kwargs) = bus_proxy_mock.AddMatch.await_args
+    (match_rule,), add_match_kwargs = bus_proxy_mock.AddMatch.await_args
     assert match_rule.header_fields["interface"] == "org.freedesktop.DBus.Properties"
     assert match_rule.header_fields["member"] == "PropertiesChanged"
     assert not add_match_kwargs
