@@ -5,13 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Home Assistant device discovery message uses `default_entity_id` instead of
+  deprecated `object_id` (requires Home Assistant 2025.10+).
+  ([#254](https://github.com/fphammerle/systemctl-mqtt/pull/254)
+  by Julien Frantz (julien.frantz@gmail.com))
+
 ### Fixed
 - add missing dbus rules for systemd Manager and Unit in apparmor profile.
   ([#244](https://github.com/fphammerle/systemctl-mqtt/pull/244)
   by Julien Frantz (julien.frantz@gmail.com))
 - publish Home Assistant device discovery config whenever Home Assistant sends
   its birth message on startup.
-  ([#244](https://github.com/fphammerle/systemctl-mqtt/pull/244)
+  ([#245](https://github.com/fphammerle/systemctl-mqtt/pull/245)
   by Julien Frantz (julien.frantz@gmail.com))
 
 ## [2.0.0] - 2025-11-22
