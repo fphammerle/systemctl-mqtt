@@ -204,7 +204,7 @@ class _State:
             "components": {
                 "logind/preparing-for-shutdown": {
                     "unique_id": unique_id_prefix + "-logind-preparing-for-shutdown",
-                    "object_id": f"{hostname}_logind_preparing_for_shutdown",  # entity id
+                    "default_entity_id": f"binary_sensor.{hostname}_logind_preparing_for_shutdown",
                     "name": "preparing for shutdown",  # home assistant prepends device name
                     "platform": "binary_sensor",
                     "state_topic": self._preparing_for_shutdown_topic,
@@ -219,9 +219,9 @@ class _State:
             # > Unsupported target for indexed assignment
             config["components"]["logind/" + mqtt_topic_suffix] = {  # type: ignore
                 "unique_id": unique_id_prefix + "-logind-" + mqtt_topic_suffix,
-                "object_id": hostname
+                "default_entity_id": f"button.{hostname}"
                 + "_logind_"
-                + mqtt_topic_suffix.replace("-", "_"),  # entity id
+                + mqtt_topic_suffix.replace("-", "_"),
                 "name": mqtt_topic_suffix.replace("-", " "),
                 "platform": "button",
                 "command_topic": self.mqtt_topic_prefix + "/" + mqtt_topic_suffix,
@@ -229,7 +229,7 @@ class _State:
         for unit_name in self._monitored_system_unit_names:
             config["components"]["unit/system/" + unit_name + "/active-state"] = {  # type: ignore
                 "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-active-state",
-                "object_id": f"{hostname}_unit_system_{unit_name}_active_state",
+                "default_entity_id": f"sensor.{hostname}_unit_system_{unit_name}_active_state",
                 "name": f"{unit_name} active state",
                 "platform": "sensor",
                 "state_topic": self.get_system_unit_active_state_mqtt_topic(
@@ -247,7 +247,9 @@ class _State:
                 if action_class(unit_name).is_allowed():
                     config["components"][component_prefix + "/" + action_name] = {  # type: ignore
                         "unique_id": f"{unique_id_prefix}-unit-system-{unit_name}-{action_name}",
-                        "object_id": f"{hostname}_unit_system_{unit_name}_{action_name}",
+                        "default_entity_id": (
+                            f"button.{hostname}_unit_system_{unit_name}_{action_name}"
+                        ),
                         "name": f"{unit_name} {action_name}",
                         "platform": "button",
                         "command_topic": self.get_system_unit_action_mqtt_topic(

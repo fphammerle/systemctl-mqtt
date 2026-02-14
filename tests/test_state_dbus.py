@@ -212,7 +212,7 @@ async def test_publish_homeassistant_device_config(
         "components": {
             "logind/preparing-for-shutdown": {
                 "unique_id": f"systemctl-mqtt-{hostname}-logind-preparing-for-shutdown",
-                "object_id": f"{hostname}_logind_preparing_for_shutdown",
+                "default_entity_id": f"binary_sensor.{hostname}_logind_preparing_for_shutdown",
                 "name": "preparing for shutdown",
                 "platform": "binary_sensor",
                 "state_topic": topic_prefix + "/preparing-for-shutdown",
@@ -221,21 +221,21 @@ async def test_publish_homeassistant_device_config(
             },
             "logind/poweroff": {
                 "unique_id": f"systemctl-mqtt-{hostname}-logind-poweroff",
-                "object_id": f"{hostname}_logind_poweroff",
+                "default_entity_id": f"button.{hostname}_logind_poweroff",
                 "name": "poweroff",
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/poweroff",
             },
             "logind/lock-all-sessions": {
                 "unique_id": f"systemctl-mqtt-{hostname}-logind-lock-all-sessions",
-                "object_id": f"{hostname}_logind_lock_all_sessions",
+                "default_entity_id": f"button.{hostname}_logind_lock_all_sessions",
                 "name": "lock all sessions",
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/lock-all-sessions",
             },
             "logind/suspend": {
                 "unique_id": f"systemctl-mqtt-{hostname}-logind-suspend",
-                "object_id": f"{hostname}_logind_suspend",
+                "default_entity_id": f"button.{hostname}_logind_suspend",
                 "name": "suspend",
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/suspend",
@@ -244,7 +244,7 @@ async def test_publish_homeassistant_device_config(
         | {
             f"unit/system/{n}/active-state": {
                 "unique_id": f"systemctl-mqtt-{hostname}-unit-system-{n}-active-state",
-                "object_id": f"{hostname}_unit_system_{n}_active_state",
+                "default_entity_id": f"sensor.{hostname}_unit_system_{n}_active_state",
                 "name": f"{n} active state",
                 "platform": "sensor",
                 "state_topic": f"{topic_prefix}/unit/system/{n}/active-state",
@@ -254,7 +254,7 @@ async def test_publish_homeassistant_device_config(
         | {
             f"unit/system/{n}/{action}": {
                 "unique_id": f"systemctl-mqtt-{hostname}-unit-system-{n}-{action}",
-                "object_id": f"{hostname}_unit_system_{n}_{action}",
+                "default_entity_id": f"button.{hostname}_unit_system_{n}_{action}",
                 "name": f"{n} {action}",
                 "platform": "button",
                 "command_topic": f"{topic_prefix}/unit/system/{n}/{action}",
