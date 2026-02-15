@@ -105,6 +105,8 @@ enables that a system unit can be started, stopped, restarted and isolated by a 
 
 ## Home Assistant 🏡
 
+> **Note:** Home Assistant 2025.10+ is required for MQTT Discovery of `systemctl-mqtt` entities.
+
 When [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
 is enabled (default in Home Assistant ≥0.117.0), the following entities will be
 added automatically:
