@@ -28,6 +28,8 @@
 - Changes to the container image (`Dockerfile`, base image, `docker-apparmor-profile`,
   `docker-compose.yml`) **are** user-facing → document them under a `container image / dockerfile:`
   list item, like existing entries.
+- Version bumps in `Pipfile.lock` are **not** user-facing, even in the `default` section installed in
+  the container image (users run `systemctl-mqtt`, not its dependencies directly) → no entry needed.
 - Credit external contributors like existing entries, e.g.
   `([#123](https://github.com/fphammerle/systemctl-mqtt/pull/123) by Jane Doe (jane@example.com))`.
 - Wording for Python version support: `declare compatibility with \`python3.X\`` (under
@@ -96,3 +98,5 @@
   `python_version >= '3.11'`). Fix by re-running `pipenv lock` on the lowest supported version.
 - When constrained packages (e.g. `setuptools`, `urllib3`) need to override transitive
   resolution, put them in `[packages]`, not `[dev-packages]`.
+- `[packages]` (`default` in `Pipfile.lock`) is installed in the container image too, not only in the
+  test environment — don't describe changes to it as test-only (e.g. "relock test environment").
